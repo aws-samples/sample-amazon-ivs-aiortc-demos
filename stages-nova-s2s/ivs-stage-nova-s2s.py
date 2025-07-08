@@ -6,11 +6,9 @@ import logging
 import argparse
 import base64
 import requests
-import time
 import numpy as np
 import uuid
 import warnings
-import io
 import os
 from typing import Dict, Any, List, Optional
 from aiortc import (
@@ -29,11 +27,9 @@ import pytz
 import datetime
 import tzlocal
 
-
 # Waveform visualization imports
 import matplotlib
 
-matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from scipy import signal
@@ -47,6 +43,7 @@ from aws_sdk_bedrock_runtime.models import InvokeModelWithBidirectionalStreamInp
 from aws_sdk_bedrock_runtime.config import Config, HTTPAuthSchemeResolver, SigV4AuthScheme
 from smithy_aws_core.credentials_resolvers.environment import EnvironmentCredentialsResolver
 
+matplotlib.use("Agg")  # Use non-interactive backend
 # Suppress warnings
 warnings.filterwarnings("ignore")
 
@@ -68,203 +65,6 @@ INPUT_SAMPLE_RATE = 16000
 OUTPUT_SAMPLE_RATE = 24000
 CHANNELS = 1
 CHUNK_SIZE = 32
-
-
-class BlankVideoTrack(VideoStreamTrack):
-    """
-    A video track that generates blank/black frames at a specified frame rate
-    """
-
-    def __init__(self, width=1280, height=720, fps=30):
-        super().__init__()
-        self.width = width
-        self.height = height
-        self.fps = fps
-        self.frame_duration = 1.0 / fps
-        self.start_time = time.time()
-        self.frame_count = 0
-
-    async def recv(self):
-        """Generate and return a black video frame"""
-        # Calculate the presentation timestamp (PTS) based on frame count
-        pts = int(self.frame_count * (1 / self.fps) * 90000)  # 90kHz clock
-
-        # Create a black frame using numpy
-        # Create RGB black frame first, then let av handle the conversion
-        frame_array = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-
-        # Create VideoFrame from numpy array
-        frame = VideoFrame.from_ndarray(frame_array, format="rgb24")
-        frame.pts = pts
-        frame.time_base = Fraction(1, 90000)  # Use Fraction for proper time_base
-
-        # Increment frame count for next frame
-        self.frame_count += 1
-
-        # Sleep to maintain frame rate
-        await asyncio.sleep(self.frame_duration)
-
-        return frame
-
-
-class WaveformVideoTrack(VideoStreamTrack):
-    """
-    A video track that generates waveform visualizations from audio data
-    """
-
-    def __init__(self, width=1280, height=720, fps=20):  # Slightly reduced FPS
-        super().__init__()
-        self.width = width
-        self.height = height
-        self.fps = fps
-        self.frame_duration = 1.0 / fps
-        self.frame_count = 0
-
-        # Audio buffer for waveform visualization
-        self.audio_buffer = np.zeros(4096)  # Smaller buffer
-        self.buffer_lock = asyncio.Lock()
-
-        # Create custom colormap (orange to blue gradient like the reference image)
-        colors = ["#FF6B35", "#F7931E", "#FFD23F", "#06FFA5", "#118AB2", "#073B4C"]
-        n_bins = 256
-        self.cmap = LinearSegmentedColormap.from_list("waveform", colors, N=n_bins)
-
-        # Setup matplotlib figure
-        plt.style.use("dark_background")
-        self.fig, self.ax = plt.subplots(figsize=(self.width / 100, self.height / 100), dpi=100)
-        self.fig.patch.set_facecolor("black")
-        self.ax.set_facecolor("black")
-
-        # Remove axes and margins
-        self.ax.set_xticks([])
-        self.ax.set_yticks([])
-        self.ax.set_xlim(0, len(self.audio_buffer))
-        self.ax.set_ylim(-1.1, 1.1)
-        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-        logger.info(f"🌊 WaveformVideoTrack initialized: {width}x{height} @ {fps}fps")
-
-    async def add_audio_data(self, audio_bytes: bytes):
-        """Add audio data to the waveform buffer"""
-        try:
-            # Convert bytes to numpy array
-            audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
-
-            # Normalize to [-1, 1] range
-            if len(audio_array) > 0:
-                audio_normalized = audio_array.astype(np.float32) / 32768.0
-
-                async with self.buffer_lock:
-                    # Shift buffer and add new data
-                    shift_amount = min(len(audio_normalized), len(self.audio_buffer))
-                    self.audio_buffer[:-shift_amount] = self.audio_buffer[shift_amount:]
-                    self.audio_buffer[-shift_amount:] = audio_normalized[-shift_amount:]
-
-        except Exception as e:
-            logger.error(f"Error adding audio data to waveform: {e}")
-
-    def _generate_waveform_frame(self):
-        """Generate a waveform visualization frame"""
-        try:
-            # Clear the plot
-            self.ax.clear()
-            self.ax.set_facecolor("black")
-            self.ax.set_xlim(0, len(self.audio_buffer))
-            self.ax.set_ylim(-1.1, 1.1)
-            self.ax.set_xticks([])
-            self.ax.set_yticks([])
-
-            # Create x-axis for the waveform
-            x = np.arange(len(self.audio_buffer))
-
-            # Simplified waveform for better performance
-            # Main waveform with gradient fill
-            self.ax.fill_between(x, self.audio_buffer, 0, color="cyan", alpha=0.4, interpolate=True)
-            self.ax.plot(x, self.audio_buffer, color="white", linewidth=2, alpha=0.9)
-
-            # Add frequency bars only if there's significant audio
-            if np.max(np.abs(self.audio_buffer)) > 0.1:
-                # Create frequency spectrum
-                freqs = np.fft.fft(self.audio_buffer)
-                freqs_mag = np.abs(freqs[: len(freqs) // 2])
-
-                # Normalize and create bars
-                if len(freqs_mag) > 0:
-                    freqs_mag = freqs_mag / np.max(freqs_mag) if np.max(freqs_mag) > 0 else freqs_mag
-
-                    # Create frequency bars at the bottom
-                    bar_width = len(self.audio_buffer) / len(freqs_mag)
-                    for i, mag in enumerate(freqs_mag[::8]):  # Subsample for performance
-                        x_pos = i * bar_width * 8
-                        height = mag * 0.4
-                        color_pos = i / (len(freqs_mag[::8]) - 1) if len(freqs_mag[::8]) > 1 else 0
-                        color = self.cmap(color_pos)
-
-                        self.ax.bar(x_pos, -height, width=bar_width * 6, bottom=-1.1, color=color, alpha=0.7)
-
-            # Convert plot to image
-            buf = io.BytesIO()
-            self.fig.savefig(buf, format="png", facecolor="black", bbox_inches="tight", pad_inches=0, dpi=100)
-            buf.seek(0)
-
-            # Read image data
-            img_data = buf.read()
-            buf.close()
-
-            return img_data
-
-        except Exception as e:
-            logger.error(f"Error generating waveform frame: {e}")
-            # Return None on error
-            return None
-
-    async def recv(self):
-        """Generate and return a waveform video frame"""
-        try:
-            # Generate waveform visualization
-            async with self.buffer_lock:
-                img_data = self._generate_waveform_frame()
-
-            # Convert image data to VideoFrame
-            if img_data and len(img_data) > 100:  # Valid image data
-                try:
-                    from PIL import Image
-
-                    img = Image.open(io.BytesIO(img_data))
-                    img_array = np.array(img.convert("RGB"))
-                except Exception as e:
-                    logger.error(f"Error converting image: {e}")
-                    # Fallback to black frame
-                    img_array = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-            else:
-                # Black frame
-                img_array = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-
-            # Create VideoFrame
-            frame = VideoFrame.from_ndarray(img_array, format="rgb24")
-
-            # Set timing information
-            pts = int(self.frame_count * (1 / self.fps) * 90000)  # 90kHz clock
-            frame.pts = pts
-            frame.time_base = Fraction(1, 90000)
-
-            self.frame_count += 1
-
-            # Sleep to maintain frame rate
-            await asyncio.sleep(self.frame_duration)
-
-            return frame
-
-        except Exception as e:
-            logger.error(f"Error in WaveformVideoTrack.recv: {e}")
-            # Return black frame on error
-            frame_array = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-            frame = VideoFrame.from_ndarray(frame_array, format="rgb24")
-            frame.pts = int(self.frame_count * (1 / self.fps) * 90000)
-            frame.time_base = Fraction(1, 90000)
-            self.frame_count += 1
-            await asyncio.sleep(self.frame_duration)
-            return frame
 
 
 class ThrobCircleVideoTrack(VideoStreamTrack):
@@ -756,7 +556,6 @@ class BedrockStreamManager:
             )
             self.is_active = True
 
-            # Send initialization events with proper system message
             system_prompt = (
                 "You are a friendly assistant named Tiffany that is participating in a live video call."
                 "Keep your responses very brief and conversational, like a natural spoken dialog. "
@@ -767,7 +566,6 @@ class BedrockStreamManager:
             init_events = [
                 self.START_SESSION_EVENT,
                 self.START_PROMPT_EVENT % self.prompt_name,
-                # Add system message first (required by Nova)
                 self.TEXT_CONTENT_START_EVENT % (self.prompt_name, self.content_name, "SYSTEM"),
                 self.TEXT_INPUT_EVENT % (self.prompt_name, self.content_name, system_prompt),
                 self.CONTENT_END_EVENT % (self.prompt_name, self.content_name),
@@ -1160,37 +958,31 @@ def parse_jwt(token: str) -> Dict[str, Any]:
         return {}
 
 
-def validate_publish_capability(token_payload: Dict[str, Any]) -> bool:
-    """Validate that the token has publish capabilities"""
-    capabilities = token_payload.get("capabilities", {})
-    allow_publish = capabilities.get("allow_publish", False)
+def validate_token_capability(token_payload: Dict[str, Any], capability: str) -> bool:
+    """
+    Validate that the token has the specified capability
 
-    if not allow_publish:
-        logger.error("Token does not have publish capabilities (capabilities.allow_publish != true)")
+    Args:
+        token_payload: Parsed JWT token payload
+        capability: Capability to validate ("publish" or "subscribe")
+
+    Returns:
+        True if token has the capability, False otherwise
+    """
+    capabilities = token_payload.get("capabilities", {})
+    capability_key = f"allow_{capability}"
+    has_capability = capabilities.get(capability_key, False)
+
+    if not has_capability:
+        logger.error(f"Token does not have {capability} capabilities (capabilities.{capability_key} != true)")
         return False
 
-    logger.info("✅ Token has publish capabilities")
-    return True
-
-
-def validate_subscribe_capability(token_payload: Dict[str, Any]) -> bool:
-    """Validate that the token has subscribe capabilities"""
-    capabilities = token_payload.get("capabilities", {})
-    allow_subscribe = capabilities.get("allow_subscribe", False)
-
-    if not allow_subscribe:
-        logger.error("Token does not have subscribe capabilities (capabilities.allow_subscribe != true)")
-        return False
-
-    logger.info("✅ Token has subscribe capabilities")
+    logger.info(f"✅ Token has {capability} capabilities")
     return True
 
 
 def fix_ivs_answer_sdp(sdp: str) -> str:
     """Fix IVS's SDP answer to ensure ICE candidates are in both audio and video sections"""
-    # logger.info("=== ORIGINAL IVS ANSWER ===")
-    # logger.info(sdp)
-    # logger.info("===========================")
 
     lines = sdp.split("\n")
     ice_candidates = []
@@ -1206,7 +998,6 @@ def fix_ivs_answer_sdp(sdp: str) -> str:
         # Collect ICE candidates from audio section
         if in_audio_section and line.startswith("a=candidate:"):
             ice_candidates.append(line)
-            # logger.info(f"Found ICE candidate in audio: {line}")
 
     # Second pass: add candidates to video section
     fixed_lines = []
@@ -1230,7 +1021,6 @@ def fix_ivs_answer_sdp(sdp: str) -> str:
             # If this is the last line of video section, add candidates after it
             if is_last_line or next_is_new_section or is_empty_line:
                 fixed_lines.append(line)
-                # logger.info(f"Adding {len(ice_candidates)} ICE candidates at end of video section")
                 # Add all the ICE candidates from audio section
                 for candidate in ice_candidates:
                     fixed_lines.append(candidate)
@@ -1242,11 +1032,60 @@ def fix_ivs_answer_sdp(sdp: str) -> str:
         fixed_lines.append(line)
 
     result = "\n".join(fixed_lines)
-    # logger.info("=== FIXED IVS ANSWER ===")
-    # logger.info(result)
-    # logger.info("========================")
 
     return result
+
+
+async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: int = 5) -> Optional[str]:
+    """
+    Send a WebRTC offer to a WHIP/WHEP endpoint and return the SDP answer.
+    Handles redirects while preserving Authorization headers.
+
+    Args:
+        url: The WHIP or WHEP endpoint URL
+        token: JWT token for authorization
+        sdp_offer: SDP offer string
+        max_redirects: Maximum number of redirects to follow
+
+    Returns:
+        SDP answer string if successful, None if failed
+    """
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/sdp"}
+    current_url = url
+    attempt = 1
+
+    logger.info(f"Sending WebRTC offer to endpoint: {current_url}")
+
+    while attempt <= max_redirects:
+        logger.info(f"Sending request to: {current_url} (attempt {attempt})")
+
+        try:
+            response = requests.post(current_url, data=sdp_offer, headers=headers, allow_redirects=False)
+
+            if response.status_code in [301, 302, 303, 307, 308]:
+                # Handle redirect manually to preserve Authorization header
+                redirect_url = response.headers.get("Location")
+                if redirect_url:
+                    logger.info(f"Redirect {attempt}: {current_url} -> {redirect_url}")
+                    current_url = redirect_url
+                    attempt += 1
+                    continue
+                else:
+                    logger.error("Redirect response missing Location header")
+                    return None
+            elif response.status_code == 201:
+                logger.info(f"✅ WebRTC offer accepted, received SDP answer")
+                return response.text
+            else:
+                logger.error(f"WebRTC request failed with status {response.status_code}: {response.text}")
+                return None
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed: {e}")
+            return None
+
+    logger.error(f"Too many redirects (>{max_redirects})")
+    return None
 
 
 async def join_stage_as_publisher(token: str, nova_audio_track: NovaAudioTrack, circle_video_track: ThrobCircleVideoTrack, video_only: bool):
@@ -1265,64 +1104,31 @@ async def join_stage_as_publisher(token: str, nova_audio_track: NovaAudioTrack, 
     # Add tracks to peer connection
     if not video_only:
         logger.info("🔈 Adding Nova audio track")
-        audio_transceiver = pc.addTransceiver(nova_audio_track, direction="sendrecv")
+        pc.addTransceiver(nova_audio_track, direction="sendrecv")
 
     logger.info("🔵 Adding circle video track")
-    video_transceiver = pc.addTransceiver(circle_video_track, direction="sendrecv")
+    pc.addTransceiver(circle_video_track, direction="sendrecv")
 
     logger.info("➕ Added track(s)")
 
     await pc.setLocalDescription(await pc.createOffer())
 
-    # Send offer to WHIP endpoint
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/sdp"}
-    logger.info(f"Sending WebRTC offer to WHIP endpoint: {whip_base_url}")
+    # Send offer and get answer using consolidated function
+    answer_sdp = await get_remote_sdp(whip_base_url, token, pc.localDescription.sdp)
 
-    # Handle manual redirects to preserve Authorization header
-    current_url = whip_base_url
-    max_redirects = 5
-    attempt = 1
-
-    while attempt <= max_redirects:
-        logger.info(f"Sending request to: {current_url} (attempt {attempt})")
-
-        response = requests.post(current_url, data=pc.localDescription.sdp, headers=headers, allow_redirects=False)  # Handle redirects manually
-
-        if response.status_code in [301, 302, 303, 307, 308]:
-            # Handle redirect manually to preserve Authorization header
-            redirect_url = response.headers.get("Location")
-            if redirect_url:
-                logger.info(f"Redirect {attempt}: {current_url} -> {redirect_url}")
-                current_url = redirect_url
-                attempt += 1
-                continue
-            else:
-                logger.error("Redirect response missing Location header")
-                return None
-        elif response.status_code == 201:
-            # Success!
-            break
-        else:
-            logger.error(f"WHIP request failed with status {response.status_code}: {response.text}")
-            return None
-
-    if attempt > max_redirects:
-        logger.error(f"Too many redirects (>{max_redirects})")
-        return None
-
-    if response.status_code != 201:
-        logger.error(f"Failed to establish WebRTC connection: {response.status_code} - {response.text}")
+    if not answer_sdp:
+        logger.error("❌ Failed to get SDP answer from WHIP endpoint")
         return None
 
     # Set remote description from answer
     logger.info("🔧 Setting remote description from IVS answer...")
 
     # Fix the IVS answer SDP to add ICE candidates to video section
-    fixed_answer_sdp = fix_ivs_answer_sdp(response.text)
+    fixed_answer_sdp = fix_ivs_answer_sdp(answer_sdp)
 
     await pc.setRemoteDescription(RTCSessionDescription(sdp=fixed_answer_sdp, type="answer"))
 
-    logger.info("✅ Successfully joined stage as publisher with Nova audio and waveform video")
+    logger.info("✅ Successfully joined stage as publisher with Nova audio and circle video")
     return pc
 
 
@@ -1336,8 +1142,8 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
     pc = RTCPeerConnection(config)
 
     # Add transceivers for receiving audio and video
-    audio_transceiver = pc.addTransceiver("audio", direction="recvonly")
-    video_transceiver = pc.addTransceiver("video", direction="recvonly")
+    pc.addTransceiver("audio", direction="recvonly")
+    pc.addTransceiver("video", direction="recvonly")
 
     # Audio processing state
     resampler = None
@@ -1448,28 +1254,16 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
     whep_url = f"{whip_base_url}/subscribe/{participant_id}"
     logger.info(f"🔗 WHEP URL: {whep_url}")
 
-    # Send offer to WHEP endpoint
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/sdp"}
-    logger.info(f"Sending WebRTC offer to WHEP endpoint: {whep_url}")
+    # Send offer and get answer using consolidated function
+    answer_sdp = await get_remote_sdp(whep_url, token, pc.localDescription.sdp)
 
-    response = requests.post(whep_url, data=pc.localDescription.sdp, headers=headers, allow_redirects=False)
-
-    if response.status_code in [301, 302, 307, 308]:
-        redirect_url = response.headers.get("Location")
-        if redirect_url:
-            logger.info(f"Redirect: {whep_url} -> {redirect_url}")
-            response = requests.post(redirect_url, data=pc.localDescription.sdp, headers=headers)
-        else:
-            logger.error("Redirect response missing Location header")
-            return None
-
-    if response.status_code != 201:
-        logger.error(f"Failed to establish WebRTC subscription: {response.status_code} - {response.text}")
+    if not answer_sdp:
+        logger.error("❌ Failed to get SDP answer from WHEP endpoint")
         return None
 
     # Set remote description from answer
     logger.info("🔧 Setting remote description from IVS answer...")
-    fixed_answer_sdp = fix_ivs_answer_sdp(response.text)
+    fixed_answer_sdp = fix_ivs_answer_sdp(answer_sdp)
 
     await pc.setRemoteDescription(RTCSessionDescription(sdp=fixed_answer_sdp, type="answer"))
 
@@ -1512,11 +1306,11 @@ async def main():
         return
 
     # Validate capabilities
-    if not validate_publish_capability(token_payload):
+    if not validate_token_capability(token_payload, "publish"):
         logger.error("❌ Token missing publish capabilities")
         return
 
-    if args.subscribe_to and not validate_subscribe_capability(token_payload):
+    if args.subscribe_to and not validate_token_capability(token_payload, "subscribe"):
         logger.error("❌ Token missing subscribe capabilities")
         return
 
@@ -1525,6 +1319,7 @@ async def main():
     topic = token_payload.get("topic")
     jti = token_payload.get("jti")
 
+    logger.info(f"ℹ️  Stage Events URL: {events_url}")
     logger.info(f"ℹ️  Topic: {topic}")
     logger.info(f"ℹ️  JTI: {jti}")
 
