@@ -22,7 +22,6 @@ from aiortc import (
     MediaStreamTrack,
     AudioStreamTrack,
 )
-from aiortc.contrib.media import MediaPlayer
 from av import VideoFrame, AudioFrame
 from fractions import Fraction
 import av
