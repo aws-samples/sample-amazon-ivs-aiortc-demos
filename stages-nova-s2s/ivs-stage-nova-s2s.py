@@ -252,17 +252,17 @@ class NovaAudioTrack(AudioStreamTrack):
     An audio track that streams Nova speech-to-speech responses with proper chunking
     """
 
-    def __init__(self, circle_video_track=None):
+    def __init__(self, circle_video_track=None, sample_rate=OUTPUT_SAMPLE_RATE, channels=CHANNELS, chunk_size=CHUNK_SIZE):
         super().__init__()
         self.audio_buffer = bytearray()
         self.buffer_lock = asyncio.Lock()
         self.frame_count = 0
-        self.sample_rate = OUTPUT_SAMPLE_RATE
-        self.channels = CHANNELS
+        self.sample_rate = sample_rate
+        self.channels = channels
         self.circle_video_track = circle_video_track  # Reference to update throb
 
         # Use same chunk size as nova-sonic.py for consistent timing
-        self.chunk_size_bytes = CHUNK_SIZE * 2  # 512 samples * 2 bytes per sample (16-bit)
+        self.chunk_size_bytes = chunk_size * 2  # samples * 2 bytes per sample (16-bit)
 
         logger.info(f"🔊 NovaAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes")
 
@@ -276,7 +276,7 @@ class NovaAudioTrack(AudioStreamTrack):
                     del self.audio_buffer[: self.chunk_size_bytes]
                 else:
                     # Generate silence if not enough data
-                    chunk_data = bytes(CHUNK_SIZE * 2)  # Silent chunk
+                    chunk_data = bytes(self.chunk_size_bytes)  # Silent chunk
 
             # Convert bytes to numpy array
             audio_array = np.frombuffer(chunk_data, dtype=np.int16)
@@ -334,182 +334,20 @@ class NovaAudioTrack(AudioStreamTrack):
 class BedrockStreamManager:
     """Manages bidirectional streaming with AWS Bedrock Nova for speech-to-speech"""
 
-    date_time_schema = json.dumps(
-        {
-            "type": "object",
-            "properties": {
-                "timezone": {
-                    "type": "string",
-                    "description": "Time timezone at which to return the date/time. Default to local where script is running.",
-                    "enum": pytz.all_timezones,
-                    "default": tzlocal.get_localzone().key,
-                }
-            },
-            "required": [],
-        }
-    )
-
-    # Check if weather API key is available
-    weather_api_key = os.getenv("WEATHER_API_KEY")
-    weather_tool_available = weather_api_key is not None
-
-    if not weather_tool_available:
-        logger.warning("⚠️  WEATHER_API_KEY environment variable not found. Weather tool will not be available.")
-    else:
-        logger.info("🌤️  Weather tool is available")
-
-    # Weather tool schema
-    weather_schema = json.dumps(
-        {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "The location to get weather for. Can be a city name, postal code, or coordinates (e.g., 'New York', '10001', 'London, UK')",
-                },
-            },
-            "required": ["location"],
-        }
-    )
-
-    # Event templates (simplified from the original)
-    START_SESSION_EVENT = """{
-        "event": {
-            "sessionStart": {
-                "inferenceConfiguration": {
-                    "maxTokens": 1024,
-                    "topP": 0.9,
-                    "temperature": 0.7
-                }
-            }
-        }
-    }"""
-    # fmt:off
-    # Build tools list dynamically based on availability
-    tools_list = [
-        {
-            "toolSpec": {
-                "name": "getDateAndTimeTool",
-                "description": "Get information about the current date and time",
-                "inputSchema": {
-                    "json": date_time_schema
-                }
-            }
-        }
-    ]
-    
-    # Add weather tool if API key is available
-    if weather_tool_available:
-        tools_list.append({
-            "toolSpec": {
-                "name": "getWeatherTool",
-                "description": "Get current weather information and 5-day forecast for a specified location",
-                "inputSchema": {
-                    "json": weather_schema
-                }
-            }
-        })
-
-    # fmt:off
-    START_PROMPT_EVENT = (
-        """{
-        "event": {
-            "promptStart": {
-                "promptName": "%s",
-                "textOutputConfiguration": {
-                    "mediaType": "text/plain"
-                },
-                "audioOutputConfiguration": {
-                    "mediaType": "audio/lpcm",
-                    "sampleRateHertz": 24000,
-                    "sampleSizeBits": 16,
-                    "channelCount": 1,
-                    "voiceId": "tiffany",
-                    "encoding": "base64",
-                    "audioType": "SPEECH"
-                },
-                "toolUseOutputConfiguration": {
-                    "mediaType": "application/json"
-                },
-                "toolConfiguration": {
-                    "tools": """ + json.dumps(tools_list) + """
-                }
-            }
-        }
-    }"""
-    )
-    # fmt:on
-    CONTENT_START_EVENT = """{
-        "event": {
-            "contentStart": {
-                "promptName": "%s",
-                "contentName": "%s",
-                "type": "AUDIO",
-                "interactive": true,
-                "role": "USER",
-                "audioInputConfiguration": {
-                    "mediaType": "audio/lpcm",
-                    "sampleRateHertz": 16000,
-                    "sampleSizeBits": 16,
-                    "channelCount": 1,
-                    "audioType": "SPEECH",
-                    "encoding": "base64"
-                }
-            }
-        }
-    }"""
-
-    AUDIO_EVENT_TEMPLATE = """{
-        "event": {
-            "audioInput": {
-                "promptName": "%s",
-                "contentName": "%s",
-                "content": "%s"
-            }
-        }
-    }"""
-
-    TEXT_CONTENT_START_EVENT = """{
-        "event": {
-            "contentStart": {
-                "promptName": "%s",
-                "contentName": "%s",
-                "role": "%s",
-                "type": "TEXT",
-                "interactive": true,
-                "textInputConfiguration": {
-                    "mediaType": "text/plain"
-                }
-            }
-        }
-    }"""
-
-    TEXT_INPUT_EVENT = """{
-        "event": {
-            "textInput": {
-                "promptName": "%s",
-                "contentName": "%s",
-                "content": "%s"
-            }
-        }
-    }"""
-
-    CONTENT_END_EVENT = """{
-        "event": {
-            "contentEnd": {
-                "promptName": "%s",
-                "contentName": "%s"
-            }
-        }
-    }"""
-
     def __init__(
-        self, nova_audio_track: NovaAudioTrack, circle_video_track: ThrobCircleVideoTrack, model_id="amazon.nova-sonic-v1:0", region="us-east-1"
+        self,
+        nova_audio_track: NovaAudioTrack,
+        circle_video_track: ThrobCircleVideoTrack,
+        model_id="amazon.nova-sonic-v1:0",
+        region="us-east-1",
+        input_sample_rate=INPUT_SAMPLE_RATE,
+        weather_api_key=None,
     ):
         self.model_id = model_id
         self.region = region
         self.nova_audio_track = nova_audio_track
         self.circle_video_track = circle_video_track
+        self.input_sample_rate = input_sample_rate
         self.input_subject = Subject()
         self.audio_subject = Subject()
         self.response_task = None
@@ -517,6 +355,15 @@ class BedrockStreamManager:
         self.is_active = False
         self.bedrock_client = None
         self.scheduler = None
+
+        # Weather API configuration
+        self.weather_api_key = weather_api_key
+        self.weather_tool_available = self.weather_api_key is not None
+
+        if not self.weather_tool_available:
+            logger.warning("⚠️  `weather_api_key` not found. Weather tool will not be available.")
+        else:
+            logger.info("🌤️  Weather tool is available")
 
         # Session information
         self.prompt_name = str(uuid.uuid4())
@@ -531,6 +378,168 @@ class BedrockStreamManager:
         self.tool_use_id = ""
         self.tool_name = ""
         self.pending_tool_tasks = {}
+
+        # Initialize schemas and templates
+        self._initialize_schemas_and_templates()
+
+    def _initialize_schemas_and_templates(self):
+        """Initialize JSON schemas and event templates"""
+        self.date_time_schema = json.dumps(
+            {
+                "type": "object",
+                "properties": {
+                    "timezone": {
+                        "type": "string",
+                        "description": "Time timezone at which to return the date/time. Default to local where script is running.",
+                        "enum": pytz.all_timezones,
+                        "default": tzlocal.get_localzone().key,
+                    }
+                },
+                "required": [],
+            }
+        )
+
+        # Weather tool schema
+        self.weather_schema = json.dumps(
+            {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The location to get weather for. Can be a city name, postal code, or coordinates (e.g., 'New York', '10001', 'London, UK')",
+                    },
+                },
+                "required": ["location"],
+            }
+        )
+
+        # Build tools list dynamically based on availability
+        tools_list = [
+            {
+                "toolSpec": {
+                    "name": "getDateAndTimeTool",
+                    "description": "Get information about the current date and time",
+                    "inputSchema": {"json": self.date_time_schema},
+                }
+            }
+        ]
+
+        # Add weather tool if API key is available
+        if self.weather_tool_available:
+            tools_list.append(
+                {
+                    "toolSpec": {
+                        "name": "getWeatherTool",
+                        "description": "Get current weather information and 5-day forecast for a specified location",
+                        "inputSchema": {"json": self.weather_schema},
+                    }
+                }
+            )
+
+        # Event templates
+        self.START_SESSION_EVENT = """{
+            "event": {
+                "sessionStart": {
+                    "inferenceConfiguration": {
+                        "maxTokens": 1024,
+                        "topP": 0.9,
+                        "temperature": 0.7
+                    }
+                }
+            }
+        }"""
+        # fmt:off
+        self.START_PROMPT_EVENT = (
+            """{
+            "event": {
+                "promptStart": {
+                    "promptName": "%s",
+                    "textOutputConfiguration": {
+                        "mediaType": "text/plain"
+                    },
+                    "audioOutputConfiguration": {
+                        "mediaType": "audio/lpcm",
+                        "sampleRateHertz": 24000,
+                        "sampleSizeBits": 16,
+                        "channelCount": 1,
+                        "voiceId": "tiffany",
+                        "encoding": "base64",
+                        "audioType": "SPEECH"
+                    },
+                    "toolUseOutputConfiguration": {
+                        "mediaType": "application/json"
+                    },
+                    "toolConfiguration": {
+                        "tools": """ + json.dumps(tools_list) + """
+                    }
+                }
+            }
+        }"""
+        )
+        # fmt:on
+        self.CONTENT_START_EVENT = f"""{{
+            "event": {{
+                "contentStart": {{
+                    "promptName": "%s",
+                    "contentName": "%s",
+                    "type": "AUDIO",
+                    "interactive": true,
+                    "role": "USER",
+                    "audioInputConfiguration": {{
+                        "mediaType": "audio/lpcm",
+                        "sampleRateHertz": {self.input_sample_rate},
+                        "sampleSizeBits": 16,
+                        "channelCount": 1,
+                        "audioType": "SPEECH",
+                        "encoding": "base64"
+                    }}
+                }}
+            }}
+        }}"""
+
+        self.AUDIO_EVENT_TEMPLATE = """{
+            "event": {
+                "audioInput": {
+                    "promptName": "%s",
+                    "contentName": "%s",
+                    "content": "%s"
+                }
+            }
+        }"""
+
+        self.TEXT_CONTENT_START_EVENT = """{
+            "event": {
+                "contentStart": {
+                    "promptName": "%s",
+                    "contentName": "%s",
+                    "role": "%s",
+                    "type": "TEXT",
+                    "interactive": true,
+                    "textInputConfiguration": {
+                        "mediaType": "text/plain"
+                    }
+                }
+            }
+        }"""
+
+        self.TEXT_INPUT_EVENT = """{
+            "event": {
+                "textInput": {
+                    "promptName": "%s",
+                    "contentName": "%s",
+                    "content": "%s"
+                }
+            }
+        }"""
+
+        self.CONTENT_END_EVENT = """{
+            "event": {
+                "contentEnd": {
+                    "promptName": "%s",
+                    "contentName": "%s"
+                }
+            }
+        }"""
 
     def _initialize_client(self):
         """Initialize the Bedrock client"""
@@ -1196,7 +1205,7 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
         logger.info(f"✅ Connection established: {pc.connectionState}")
 
         # Initialize resampler for Nova's expected format
-        resampler = av.AudioResampler(format="s16", layout="mono", rate=INPUT_SAMPLE_RATE)
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=nova_stream_manager.input_sample_rate)
 
         # Note: No longer starting base audio content session since we handle per-participant sessions
         # Each participant will automatically start their own content session when they send audio
@@ -1335,12 +1344,18 @@ async def main():
 
         # Initialize Nova stream manager
         logger.info("🤖 Initializing Nova speech-to-speech...")
+        # fmt:off
         nova_stream_manager = BedrockStreamManager(
-            nova_audio_track=nova_audio_track, circle_video_track=circle_video_track, model_id=args.nova_model, region=args.nova_region
+            nova_audio_track=nova_audio_track, 
+            circle_video_track=circle_video_track, 
+            model_id=args.nova_model, 
+            region=args.nova_region,
+            weather_api_key=os.getenv("WEATHER_API_KEY")
         )
+        # fmt:on
         await nova_stream_manager.initialize_stream()
 
-        # Start publishing (always happens) - now with Nova audio and circle video
+        # Start publishing
         logger.info("📤 Starting publish mode with Nova audio and circle video...")
         publish_pc = await join_stage_as_publisher(args.token, nova_audio_track, circle_video_track, args.video_only)
 
