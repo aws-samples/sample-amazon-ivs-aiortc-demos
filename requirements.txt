@@ -23,11 +23,6 @@ smithy-aws-core>=0.0.1
 pyaudio>=0.2.13
 rx>=3.2.0
 
-# Waveform visualization
-matplotlib>=3.5.0
-scipy>=1.7.0
-Pillow>=8.0.0
-
 pytz
 tzlocal
 # Standard library dependencies (included with Python)

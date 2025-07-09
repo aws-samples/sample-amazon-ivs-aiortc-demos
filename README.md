@@ -264,13 +264,13 @@ A comprehensive script that combines IVS Real-Time Stages with Amazon Nova Sonic
 ```bash
 cd stages-nova-s2s
 python ivs-stage-nova-s2s.py \
-  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "ABC123"
 ```
 
 **Command-line Arguments:**
 - `--token`: JWT participant token with both publish and subscribe capabilities (required)
-- `--video-only`: Publish video only, no audio (optional flag)
-- `--subscribe-to`: List of participant IDs to subscribe to (optional)
+- `--subscribe-to`: Participant ID to subscribe to (required)
 - `--nova-model`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
 - `--nova-region`: AWS region for Nova service (default: "us-east-1")
 
@@ -425,9 +425,6 @@ python your-script.py --your-args
 - `smithy-aws-core>=0.0.1` - AWS SDK core
 - `pyaudio>=0.2.13` - Audio I/O
 - `rx>=3.2.0` - Reactive extensions
-- `matplotlib>=3.5.0` - Visualization
-- `scipy>=1.7.0` - Signal processing
-- `Pillow>=8.0.0` - Image processing
 
 ### Utility Dependencies
 - `pytz` - Timezone handling
