@@ -327,14 +327,6 @@ class BedrockStreamManager:
         """Add an audio chunk to be processed by Nova"""
         self.audio_subject.on_next({"audio_bytes": audio_bytes})
 
-    def add_audio_chunk(self, audio_bytes, participant_id="default"):
-        """Add an audio chunk to be processed by Nova"""
-        # Create unique content name per participant
-        content_name = f"{self.audio_content_name}_{participant_id}"
-        self.audio_subject.on_next(
-            {"audio_bytes": audio_bytes, "prompt_name": self.prompt_name, "content_name": content_name, "participant_id": participant_id}
-        )
-
     async def start_audio_content(self):
         """Start audio content session"""
         content_start_event = self.CONTENT_START_EVENT % (self.prompt_name, self.audio_content_name)
