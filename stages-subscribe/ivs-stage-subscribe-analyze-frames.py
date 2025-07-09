@@ -6,8 +6,6 @@ import logging
 import argparse
 import base64
 import requests
-import warnings
-import os
 import time
 import io
 from typing import Dict, Any, List, Optional
@@ -18,7 +16,6 @@ from aiortc import (
     RTCSessionDescription,
     MediaStreamTrack,
 )
-import av
 import boto3
 from PIL import Image
 
