@@ -178,7 +178,7 @@ Enable detailed logging:
 ```bash
 export PYTHONPATH=$PYTHONPATH:.
 python -c "import logging; logging.basicConfig(level=logging.DEBUG)"
-python ivs-stage-nova-s2s.py --token "your-token"
+python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 ```
 
 ### Performance Optimization
