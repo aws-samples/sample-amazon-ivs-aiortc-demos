@@ -35,18 +35,18 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 
 ```
 ivs-aiortc/
-├── README.md                           # This file
-├── requirements.txt                    # Python dependencies
-├── .gitignore                         # Git ignore rules
-├── stages-publish/                    # Publishing examples
-│   ├── ivs-stage-publish.py          # Basic media publishing
-│   ├── ivs-stage-publish-events.py   # Publishing with event handling
-│   └── ivs-stage-pub-sub.py          # Simultaneous publish/subscribe
-├── stages-subscribe/                  # Subscribing examples
-│   ├── ivs-stage-subscribe-transcribe.py  # Subscribe with transcription
+├── README.md                                  # This file
+├── requirements.txt                           # Python dependencies
+├── .gitignore                                 # Git ignore rules
+├── stages-publish/                            # Publishing examples
+│   ├── ivs-stage-publish.py                   # Basic media publishing
+│   ├── ivs-stage-publish-events.py            # Publishing with event handling
+│   └── ivs-stage-pub-sub.py                   # Simultaneous publish/subscribe
+├── stages-subscribe/                          # Subscribing examples
+│   ├── ivs-stage-subscribe-transcribe.py      # Subscribe with transcription
 │   └── ivs-stage-subscribe-analyze-frames.py  # Subscribe with AI video analysis
-└── stages-nova-s2s/                  # AI Speech-to-Speech
-    └── ivs-stage-nova-s2s.py         # Nova Sonic integration
+└── stages-nova-s2s/                           # AI Speech-to-Speech
+    └── ivs-stage-nova-s2s.py                  # Nova Sonic integration
 ```
 
 ## Prerequisites
