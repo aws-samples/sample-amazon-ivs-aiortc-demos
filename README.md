@@ -34,7 +34,7 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 ## Project Structure
 
 ```
-ivs-aiortc/
+amazon-ivs-aiortc-demos/
 ├── README.md                                  # This file
 ├── requirements.txt                           # Python dependencies
 ├── .gitignore                                 # Git ignore rules
