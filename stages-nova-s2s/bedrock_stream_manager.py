@@ -257,7 +257,7 @@ class BedrockStreamManager:
 
             system_prompt = (
                 "You are a friendly assistant named Tiffany that is participating in a live video call."
-                "Keep your responses very brief and conversational, like a natural spoken dialog. "
+                "Keep your responses very brief and conversational, like a natural spoken dialog."
                 "Respond in 1-2 sentences maximum."
             )
 

@@ -1,6 +1,8 @@
 # Amazon-ivs-aiortc-demos
 
-A comprehensive collection of Python scripts demonstrating various Amazon IVS (Interactive Video Service) Real-Time Stages capabilities using the aiortc WebRTC library. This project showcases publishing, subscribing, transcription, and AI-powered speech-to-speech functionality.
+A comprehensive collection of Python demo scripts demonstrating various Amazon IVS (Interactive Video Service) Real-Time Stages capabilities using the aiortc WebRTC library. This project showcases publishing, subscribing, transcription, and AI-powered speech-to-speech functionality.
+
+** This project is intended for education purposes only and not for production usage.** 
 
 ## Table of Contents
 
@@ -27,7 +29,7 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 - **AI Video Analysis**: Analyze video frames using Amazon Bedrock Claude models
 - **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
 - **Event Handling**: Process real-time stage events via WebSocket connections
-- **Waveform Visualization**: Generate dynamic audio visualizations
+- **Audio Visualization**: Generate dynamic audio visualizations
 
 ## Project Structure
 
