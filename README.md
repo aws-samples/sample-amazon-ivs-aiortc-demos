@@ -67,9 +67,9 @@ Your AWS credentials need the following permissions:
 
 ## Installation
 
-1. **Clone or navigate to the project directory:**
+1. **Clone and navigate to the project directory:**
    ```bash
-   cd /Users/shartodd/projects/scratch/ivs-aiortc
+   cd /amazon-ivs-aiortc-demos
    ```
 
 2. **Create and activate a virtual environment:**
@@ -317,7 +317,7 @@ A comprehensive script that combines IVS Real-Time Stages with Amazon Nova Sonic
 cd stages-nova-s2s
 python ivs-stage-nova-s2s.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
-  --subscribe-to "ABC123"
+  --subscribe-to "participant123"
 ```
 
 **Command-line Arguments:**
@@ -363,7 +363,7 @@ python stages-publish/ivs-stage-publish-events.py \
 ```bash
 # Subscribe and transcribe audio in Spanish
 python stages-subscribe/ivs-stage-subscribe-transcribe.py \
-  --participant-id "user123" \
+  --participant-id "participant123" \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --language "es" \
   --whisper-model "medium"
