@@ -8,6 +8,8 @@ import base64
 import requests
 import warnings
 import os
+import time
+import io
 from typing import Dict, Any, List, Optional
 from aiortc import (
     RTCBundlePolicy,
@@ -17,22 +19,13 @@ from aiortc import (
     MediaStreamTrack,
 )
 import av
+import boto3
+from PIL import Image
 
-
-# Nova speech-to-speech imports
-
-
-# Local imports
-from agent_video_track import AgentVideoTrack
-from agent_audio_track import AgentAudioTrack
-from bedrock_stream_manager import BedrockStreamManager
-
-# Suppress warnings
-warnings.filterwarnings("ignore")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("ivs-stage-nova-s2s")
+logger = logging.getLogger("ivs-stage-subscribe-analyze-frames")
 logger.setLevel(logging.DEBUG)
 aiortc_logger = logging.getLogger("aiortc")
 aiortc_logger.setLevel(logging.ERROR)
@@ -43,11 +36,111 @@ aioice_logger.setLevel(logging.CRITICAL)
 stun_logger = logging.getLogger("aioice.stun")
 stun_logger.setLevel(logging.CRITICAL)
 
-# Audio configuration for Nova
-INPUT_SAMPLE_RATE = 16000
-OUTPUT_SAMPLE_RATE = 24000
-CHANNELS = 1
-CHUNK_SIZE = 32
+
+class VideoFrameAnalyzer:
+    """Handles video frame analysis using Amazon Bedrock Claude"""
+
+    def __init__(self, analysis_interval: float = 5.0, region: str = "us-east-1", model_id: str = "anthropic.claude-sonnet-4-20250514-v1:0"):
+        """
+        Initialize the video frame analyzer
+
+        Args:
+            analysis_interval: Time in seconds between frame analyses
+            region: AWS region for Bedrock service
+            model_id: Bedrock model ID to use for analysis
+        """
+        self.analysis_interval = analysis_interval
+        self.last_analysis_time = 0
+        self.bedrock_client = boto3.client("bedrock-runtime", region_name=region)
+        self.model_id = model_id
+
+        logger.info(f"🤖 VideoFrameAnalyzer initialized with {analysis_interval}s interval")
+        logger.info(f"🌍 Using Bedrock region: {region}")
+        logger.info(f"🧠 Using model: {self.model_id}")
+
+    def should_analyze_frame(self) -> bool:
+        """Check if enough time has passed since last analysis"""
+        current_time = time.time()
+        if current_time - self.last_analysis_time >= self.analysis_interval:
+            self.last_analysis_time = current_time
+            return True
+        return False
+
+    def frame_to_base64(self, frame) -> str:
+        """Convert video frame to base64 encoded JPEG"""
+        try:
+            # Convert frame to PIL Image
+            img = frame.to_image()
+
+            # Convert to RGB if needed
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Save to bytes buffer as JPEG
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            buffer.seek(0)
+
+            # Encode to base64
+            img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            return img_base64
+
+        except Exception as e:
+            logger.error(f"Error converting frame to base64: {e}")
+            return None
+
+    async def analyze_frame(self, frame, participant_id: str) -> Optional[str]:
+        """
+        Analyze a video frame using Claude
+
+        Args:
+            frame: Video frame from aiortc
+            participant_id: ID of the participant being analyzed
+
+        Returns:
+            Analysis result string or None if failed
+        """
+        try:
+            # Convert frame to base64
+            frame_base64 = self.frame_to_base64(frame)
+            if not frame_base64:
+                return None
+
+            # Prepare the message for Claude
+            message = {
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": frame_base64}},
+                    {
+                        "type": "text",
+                        "text": "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. This could be used for content discovery, moderation, or accessibility purposes. Be specific and comprehensive.",
+                    },
+                ],
+            }
+
+            # Call Bedrock
+            logger.info(f"🔍 Analyzing frame for participant {participant_id}...")
+
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps({"anthropic_version": "bedrock-2023-05-31", "max_tokens": 1000, "messages": [message], "temperature": 0.1}),
+            )
+
+            # Parse response
+            response_body = json.loads(response["body"].read())
+            analysis_result = response_body["content"][0]["text"]
+
+            logger.info(f"✅ Frame analysis completed for participant {participant_id}")
+            logger.info(f"📝 Analysis: {analysis_result}")
+
+            return analysis_result
+
+        except Exception as e:
+            logger.error(f"Error analyzing frame: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return None
 
 
 def parse_jwt(token: str) -> Dict[str, Any]:
@@ -199,51 +292,8 @@ async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: in
     return None
 
 
-async def join_stage_as_publisher(token: str, agent_audio_track: AgentAudioTrack, agent_video_track: AgentVideoTrack):
-    """Join the IVS stage as a publisher using WebRTC with Nova audio and agent video"""
-    logger.info("🚀 Joining stage as publisher with Nova audio and agent video...")
-
-    # Create peer connection
-    config = RTCConfiguration()
-    config.bundlePolicy = RTCBundlePolicy.MAX_BUNDLE
-    pc = RTCPeerConnection(config)
-
-    # Use global WHIP base URL for publishing
-    whip_base_url = "https://global.whip.live-video.net"
-    logger.info(f"🔗 WHIP Base URL: {whip_base_url}")
-
-    # Add tracks to peer connection
-    logger.info("🔈 Adding Nova audio track")
-    pc.addTransceiver(agent_audio_track, direction="sendrecv")
-
-    logger.info("🔵 Adding agent video track")
-    pc.addTransceiver(agent_video_track, direction="sendrecv")
-
-    logger.info("➕ Added tracks")
-
-    await pc.setLocalDescription(await pc.createOffer())
-
-    # Send offer and get answer using consolidated function
-    answer_sdp = await get_remote_sdp(whip_base_url, token, pc.localDescription.sdp)
-
-    if not answer_sdp:
-        logger.error("❌ Failed to get SDP answer from WHIP endpoint")
-        return None
-
-    # Set remote description from answer
-    logger.info("🔧 Setting remote description from IVS answer...")
-
-    # Fix the IVS answer SDP to add ICE candidates to video section
-    fixed_answer_sdp = fix_ivs_answer_sdp(answer_sdp)
-
-    await pc.setRemoteDescription(RTCSessionDescription(sdp=fixed_answer_sdp, type="answer"))
-
-    logger.info("✅ Successfully joined stage as publisher with Nova audio and agent video")
-    return pc
-
-
-async def subscribe_to_participant(token: str, participant_id: str, nova_stream_manager: BedrockStreamManager):
-    """Subscribe to a participant's audio/video streams and process audio through Nova"""
+async def subscribe_to_participant(token: str, participant_id: str, analyzer: VideoFrameAnalyzer = None):
+    """Subscribe to a participant's audio/video streams and analyze video frames"""
     logger.info(f"🎧 Subscribing to participant: {participant_id}")
 
     # Create peer connection
@@ -281,58 +331,24 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
         logger.info(f"Track readyState: {track.readyState}")
 
         if track.kind == "audio":
-            logger.info("🔊 Audio track received - processing through Nova")
+            logger.info("🔊 Audio track received")
             logger.info("Creating audio processing task...")
             task = asyncio.create_task(process_audio_track(track))
             logger.info(f"Audio processing task created: {task}")
         elif track.kind == "video":
-            logger.info("🎥 Video track received - ignoring for now")
-            # Create a task for video processing (just consuming frames)
-            task = asyncio.create_task(process_video_track(track))
+            logger.info("🎥 Video track received")
+            # Create a task for video processing with optional analysis
+            task = asyncio.create_task(process_video_track(track, analyzer, participant_id))
             logger.info(f"Video processing task created: {task}")
 
     async def process_audio_track(track: MediaStreamTrack):
         """Process audio track in a separate async task"""
-        nonlocal resampler
-
-        logger.info("🎵 Starting audio processing task")
-        logger.info(f"Audio track readyState: {track.readyState}")
-
-        # Wait for connection to be established
-        logger.info("Waiting for WebRTC connection to be established...")
-        while pc.connectionState not in ["connected", "completed"]:
-            logger.info(f"Connection state: {pc.connectionState}, waiting...")
-            await asyncio.sleep(0.1)
-        logger.info(f"✅ Connection established: {pc.connectionState}")
-
-        # Initialize resampler for Nova's expected format
-        resampler = av.AudioResampler(format="s16", layout="mono", rate=nova_stream_manager.input_sample_rate)
-
-        # Note: No longer starting base audio content session since we handle per-participant sessions
-        # Each participant will automatically start their own content session when they send audio
-
-        # Process audio frames
+        logger.info("🎵 Starting audio processing task (noop)")
         try:
             frame_count = 0
             while True:
-                try:
-                    # Add timeout to recv() to avoid infinite blocking
-                    frame = await asyncio.wait_for(track.recv(), timeout=5.0)
-                    frame_count += 1
-
-                    # Resample to Nova's expected format (16kHz, mono, s16)
-                    resampled_frames = resampler.resample(frame)
-
-                    for i, resampled_frame in enumerate(resampled_frames):
-                        # Convert to bytes and send directly to Nova
-                        audio_bytes = resampled_frame.to_ndarray().tobytes()
-                        nova_stream_manager.add_audio_chunk(audio_bytes)
-
-                except asyncio.TimeoutError:
-                    logger.warning(f"Timeout waiting for audio frame {frame_count} - no audio data received in 5 seconds")
-                    logger.info(f"Track readyState: {track.readyState}, Connection state: {pc.connectionState}")
-                    # Continue trying instead of breaking
-                    continue
+                frame = await track.recv()
+                frame_count += 1
 
         except Exception as e:
             logger.error(f"Audio track processing error for participant {participant_id}: {e}")
@@ -340,14 +356,23 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
 
             traceback.print_exc()
 
-    async def process_video_track(track: MediaStreamTrack):
-        """Process video track in a separate async task"""
+    async def process_video_track(track: MediaStreamTrack, analyzer: VideoFrameAnalyzer = None, participant_id: str = "unknown"):
+        """Process video track in a separate async task with optional frame analysis"""
         logger.info("🎬 Starting video processing task")
+        if analyzer:
+            logger.info(f"🤖 Frame analysis enabled (interval: {analyzer.analysis_interval}s)")
+
         try:
             frame_count = 0
             while True:
                 frame = await track.recv()
                 frame_count += 1
+
+                # Analyze frame if analyzer is provided and enough time has passed
+                if analyzer and analyzer.should_analyze_frame():
+                    # Run analysis in background to avoid blocking frame processing
+                    asyncio.create_task(analyzer.analyze_frame(frame, participant_id))
+
         except Exception as e:
             logger.info(f"Video track ended for participant {participant_id}: {e}")
 
@@ -377,30 +402,33 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
 
     await pc.setRemoteDescription(RTCSessionDescription(sdp=fixed_answer_sdp, type="answer"))
 
-    logger.info("✅ Successfully subscribed to participant with Nova processing")
+    logger.info("✅ Successfully subscribed to participant")
     return pc
 
 
 def parse_args():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(description="IVS Stage Publisher/Subscriber with Nova Speech-to-Speech")
+    parser = argparse.ArgumentParser(description="IVS Stage Subscriber with Video Frame Analyzer")
     parser.add_argument("--token", required=True, help="IVS stage participant token")
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
-    # Nova options
-    parser.add_argument("--nova-model", default="amazon.nova-sonic-v1:0", help="Nova model ID")
-    parser.add_argument("--nova-region", default="us-east-1", help="AWS region for Nova")
+    parser.add_argument("--analysis-interval", type=float, default=30.0, help="Time in seconds between frame analyses (default: 30.0)")
+    parser.add_argument("--aws-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
+    parser.add_argument(
+        "--model-id",
+        default="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
+    )
+    parser.add_argument("--disable-analysis", action="store_true", help="Disable video frame analysis (just subscribe to video)")
 
     return parser.parse_args()
 
 
 async def main():
-    """Main function that handles both publishing and subscribing with Nova speech-to-speech"""
+    """Main function that handles subscribing to Amazon IVS participant"""
     args = parse_args()
 
-    logger.info("🎬 Starting IVS Stage Publisher/Subscriber with Nova Speech-to-Speech")
+    logger.info("🎬 IVS Stage Subscriber with Video Frame Analyzer")
     logger.info(f"🔑 Using token: {args.token[:50]}... (truncated)")
-    logger.info(f"🤖 Nova model: {args.nova_model}")
-    logger.info(f"🌍 Nova region: {args.nova_region}")
     token_payload = parse_jwt(args.token)
 
     if not token_payload:
@@ -408,15 +436,10 @@ async def main():
         return
 
     # Validate capabilities
-    if not validate_token_capability(token_payload, "publish"):
-        logger.error("❌ Token missing publish capabilities")
-        return
-
     if args.subscribe_to and not validate_token_capability(token_payload, "subscribe"):
         logger.error("❌ Token missing subscribe capabilities")
         return
 
-    # Extract required fields from token
     events_url = token_payload.get("events_url")
     topic = token_payload.get("topic")
     jti = token_payload.get("jti")
@@ -425,45 +448,30 @@ async def main():
     logger.info(f"ℹ️  Topic: {topic}")
     logger.info(f"ℹ️  JTI: {jti}")
 
+    # Initialize video frame analyzer if not disabled
+    analyzer = None
+    if not args.disable_analysis:
+        try:
+            analyzer = VideoFrameAnalyzer(analysis_interval=args.analysis_interval, region=args.aws_region, model_id=args.model_id)
+            logger.info(f"🤖 Video frame analysis enabled (every {args.analysis_interval}s)")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize VideoFrameAnalyzer: {e}")
+            logger.error("Continuing without frame analysis...")
+    else:
+        logger.info("🚫 Video frame analysis disabled")
+
     try:
         connections = []
-        nova_stream_manager = None
-
-        # Create agent video track for visualization
-        agent_video_track = AgentVideoTrack(width=640, height=360, fps=20)
-
-        # Create Nova audio track for publishing responses (with agent video reference)
-        # fmt:off
-        agent_audio_track = AgentAudioTrack(
-            agent_video_track=agent_video_track, 
-            sample_rate=OUTPUT_SAMPLE_RATE, 
-            channels=CHANNELS, 
-            chunk_size=CHUNK_SIZE
-        )
-        # fmt:on
-
-        # Initialize Nova stream manager
-        logger.info("🤖 Initializing Nova speech-to-speech...")
-        # fmt:off
-        nova_stream_manager = BedrockStreamManager(
-            agent_audio_track=agent_audio_track, 
-            agent_video_track=agent_video_track, 
-            model_id=args.nova_model, 
-            region=args.nova_region,
-            weather_api_key=os.getenv("WEATHER_API_KEY")
-        )
-        # fmt:on
-        await nova_stream_manager.initialize_stream()
 
         # Start subscribing to participants if specified
         if args.subscribe_to:
             participant_id = args.subscribe_to
             logger.info(f"📥 Starting subscribe mode for participant: {participant_id}")
 
-            subscribe_pc = await subscribe_to_participant(args.token, participant_id, nova_stream_manager)
+            subscribe_pc = await subscribe_to_participant(args.token, participant_id, analyzer)
 
             if subscribe_pc:
-                logger.info(f"✅ Successfully subscribed to {participant_id} with Nova processing")
+                logger.info(f"✅ Successfully subscribed to {participant_id}")
                 connections.append(subscribe_pc)
             else:
                 logger.error(f"❌ Failed to subscribe to {participant_id}")
@@ -472,31 +480,24 @@ async def main():
             logger.error("❌ No connections established")
             return
 
-        # Start publishing
-        logger.info("📤 Starting publish mode with Nova audio and agent video...")
-        publish_pc = await join_stage_as_publisher(args.token, agent_audio_track, agent_video_track)
-
-        if publish_pc:
-            logger.info("🎉 WebRTC publishing established with Nova audio and waveform video!")
-            connections.append(publish_pc)
+        if subscribe_pc:
+            logger.info("🎉 WebRTC subscription established!")
+            if analyzer:
+                logger.info(f"🔍 Frame analysis active - analyzing every {args.analysis_interval} seconds")
+            else:
+                logger.info("📺 Video streaming without analysis")
         else:
-            logger.error("❌ Failed to establish WebRTC publishing")
+            logger.error("❌ Failed to establish WebRTC subscription")
             return
 
         # Keep all connections alive
         try:
-            logger.info(f"🔄 {len(connections)} connection(s) active with Nova speech-to-speech. Press Ctrl+C to exit.")
-            logger.info("🎙️  Speak and Nova will respond through the IVS stage!")
+            logger.info(f"🔄 {len(connections)} connection(s) active. Press Ctrl+C to exit.")
             while True:
                 await asyncio.sleep(1)  # Keep the event loop running
         except KeyboardInterrupt:
             logger.info("🛑 Shutting down...")
         finally:
-            # Clean up Nova stream manager
-            if nova_stream_manager:
-                logger.info("🤖 Closing Nova stream...")
-                await nova_stream_manager.close()
-
             # Clean up all peer connections
             logger.info("🔌 Closing all connections...")
             for pc in connections:

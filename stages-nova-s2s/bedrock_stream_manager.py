@@ -6,7 +6,7 @@ import uuid
 import logging
 import json
 from agent_video_track import AgentVideoTrack
-from nova_audio_track import NovaAudioTrack
+from agent_audio_track import AgentAudioTrack
 from agent_tools import AgentTools
 
 from rx.subject import Subject
@@ -25,7 +25,7 @@ class BedrockStreamManager:
 
     def __init__(
         self,
-        nova_audio_track: NovaAudioTrack,
+        agent_audio_track: AgentAudioTrack,
         agent_video_track: AgentVideoTrack,
         model_id="amazon.nova-sonic-v1:0",
         region="us-east-1",
@@ -34,7 +34,7 @@ class BedrockStreamManager:
     ):
         self.model_id = model_id
         self.region = region
-        self.nova_audio_track = nova_audio_track
+        self.agent_audio_track = agent_audio_track
         self.agent_video_track = agent_video_track
         self.input_sample_rate = input_sample_rate
         self.input_subject = Subject()
@@ -374,7 +374,7 @@ class BedrockStreamManager:
                                     audio_bytes = base64.b64decode(audio_content)
 
                                     # Send audio to Nova audio track for publishing (it will update video track throb)
-                                    await self.nova_audio_track.add_audio_data(audio_bytes)
+                                    await self.agent_audio_track.add_audio_data(audio_bytes)
 
                                 elif "toolUse" in json_data["event"]:
                                     # Keep thinking state on during tool use
@@ -423,7 +423,7 @@ class BedrockStreamManager:
             await self.stream_response.input_stream.close()
 
         # Stop the audio track
-        await self.nova_audio_track.stop()
+        await self.agent_audio_track.stop()
 
     async def process_tool_async(self, tool_name, tool_content):
         """Process a tool call asynchronously and return the result"""

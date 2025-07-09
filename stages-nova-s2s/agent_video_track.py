@@ -47,7 +47,7 @@ class AgentVideoTrack(VideoStreamTrack):
         logger.info(f"🔵 AgentVideoTrack initialized: {width}x{height} @ {fps}fps")
 
     def update_throb_level(self, audio_level: float):
-        """Update the throb level directly (called by NovaAudioTrack)"""
+        """Update the throb level directly (called by AgentAudioTrack)"""
         self.audio_level = min(audio_level, 1.0)  # Ensure it doesn't exceed 1.0
 
     def set_thinking_state(self, thinking: bool):

@@ -8,7 +8,7 @@ from aiortc import AudioStreamTrack
 logger = logging.getLogger(__name__)
 
 
-class NovaAudioTrack(AudioStreamTrack):
+class AgentAudioTrack(AudioStreamTrack):
     """
     An audio track that streams Nova speech-to-speech responses with proper chunking
     """
@@ -25,7 +25,7 @@ class NovaAudioTrack(AudioStreamTrack):
         # Use same chunk size as nova-sonic.py for consistent timing
         self.chunk_size_bytes = chunk_size * 2  # samples * 2 bytes per sample (16-bit)
 
-        logger.info(f"🔊 NovaAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes")
+        logger.info(f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes")
 
     async def recv(self):
         """Generate and return audio frames from Nova responses"""
@@ -66,7 +66,7 @@ class NovaAudioTrack(AudioStreamTrack):
             return frame
 
         except Exception as e:
-            logger.error(f"Error in NovaAudioTrack.recv: {e}")
+            logger.error(f"Error in AgentAudioTrack.recv: {e}")
             raise
 
     async def add_audio_data(self, audio_data: bytes):

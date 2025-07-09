@@ -24,6 +24,7 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 - **WebRTC Publishing**: Stream video/audio content to IVS stages
 - **WebRTC Subscribing**: Receive and process streams from IVS stages
 - **Real-time Transcription**: Convert speech to text using OpenAI Whisper
+- **AI Video Analysis**: Analyze video frames using Amazon Bedrock Claude models
 - **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
 - **Event Handling**: Process real-time stage events via WebSocket connections
 - **Waveform Visualization**: Generate dynamic audio visualizations
@@ -40,7 +41,8 @@ ivs-aiortc/
 │   ├── ivs-stage-publish-events.py   # Publishing with event handling
 │   └── ivs-stage-pub-sub.py          # Simultaneous publish/subscribe
 ├── stages-subscribe/                  # Subscribing examples
-│   └── ivs-stage-subscribe-transcribe.py  # Subscribe with transcription
+│   ├── ivs-stage-subscribe-transcribe.py  # Subscribe with transcription
+│   └── ivs-stage-subscribe-analyze-frames.py  # Subscribe with AI video analysis
 └── stages-nova-s2s/                  # AI Speech-to-Speech
     └── ivs-stage-nova-s2s.py         # Nova Sonic integration
 ```
@@ -57,6 +59,7 @@ ivs-aiortc/
 
 Your AWS credentials need the following permissions:
 - `ivs:CreateParticipantToken`
+- `bedrock:InvokeModel` (for video frame analysis with Claude)
 - `bedrock:InvokeModelWithBidirectionalStream` (for Nova Sonic)
 - Access to Amazon IVS Real-Time Stages
 
@@ -244,6 +247,53 @@ python ivs-stage-subscribe-transcribe.py \
 - Portuguese ("pt")
 - And many more supported by Whisper
 
+#### ivs-stage-subscribe-analyze-frames.py
+
+Subscribes to IVS stage video streams and provides AI-powered video frame analysis using Amazon Bedrock Claude models for content discovery, moderation, and accessibility.
+
+**Features:**
+- Subscribes to video tracks from specific participants in IVS Real-Time Stages
+- AI-powered video frame analysis using Claude Sonnet 4
+- Configurable analysis intervals to control costs
+- Support for multiple Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
+- Detailed frame descriptions for content moderation and accessibility
+- Background processing to avoid blocking video streams
+- Cost-conscious design with smart frame sampling
+
+**Usage:**
+```bash
+cd stages-subscribe
+python ivs-stage-subscribe-analyze-frames.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+```
+
+**Command-line Arguments:**
+- `--token`: JWT participant token with subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
+- `--aws-region`: AWS region for Bedrock service (default: "us-east-1")
+- `--model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--disable-analysis`: Disable video frame analysis, just subscribe to video (optional flag)
+
+**Supported Models:**
+- **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-20250514-v1:0` - Most capable, best for complex analysis
+- **Claude 3.5 Sonnet**: `anthropic.claude-3-5-sonnet-20241022-v2:0` - Very capable, good balance of performance and cost
+- **Claude 3.5 Haiku**: `anthropic.claude-3-5-haiku-20241022-v1:0` - Fastest and cheapest, good for basic content moderation
+
+**Use Cases:**
+- **Content Moderation**: Automatically detect inappropriate content in live streams
+- **Content Discovery**: Generate descriptions and tags for video content
+- **Accessibility**: Create detailed descriptions for visually impaired users
+- **Analytics**: Track objects, activities, and engagement in video streams
+- **Compliance**: Monitor streams for regulatory compliance
+
+**Cost Control Features:**
+- Configurable analysis intervals (default 30 seconds to minimize costs)
+- Background processing doesn't block video streaming
+- Option to disable analysis entirely for testing
+- Smart error handling prevents failed analyses from crashing streams
+
 ### Stages Nova Speech-to-Speech
 
 The `stages-nova-s2s/` directory contains the most advanced script integrating Amazon Nova Sonic for AI-powered speech-to-speech functionality.
@@ -276,7 +326,7 @@ python ivs-stage-nova-s2s.py \
 
 **Key Components:**
 
-1. **NovaAudioTrack**: Custom audio track for streaming Nova responses
+1. **AgentAudioTrack**: Custom audio track for streaming Nova responses
 2. **WaveformVideoTrack**: Dynamic waveform visualization
 3. **BedrockStreamManager**: Manages bidirectional Nova Sonic streaming
 4. **Audio Processing**: Handles resampling between IVS (48kHz) and Nova (16kHz)
@@ -315,6 +365,40 @@ python stages-subscribe/ivs-stage-subscribe-transcribe.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --language "es" \
   --whisper-model "medium"
+```
+
+### Video Frame Analysis Examples
+
+```bash
+# Basic video frame analysis (every 30 seconds with Claude Sonnet 4)
+python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# Frequent analysis for real-time moderation (every 5 seconds)
+python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --analysis-interval 5.0
+
+# Cost-effective analysis using Claude 3.5 Haiku (every 60 seconds)
+python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --model-id "anthropic.claude-3-5-haiku-20241022-v1:0" \
+  --analysis-interval 60.0
+
+# Analysis in different AWS region
+python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --aws-region "eu-west-1"
+
+# Subscribe to video without analysis (testing connectivity)
+python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --disable-analysis
 ```
 
 ### AI Speech-to-Speech Example
@@ -383,7 +467,13 @@ aws ivs-realtime create-participant-token \
    - Check model availability in your region
    - Ensure proper event sequence (START_SESSION → START_PROMPT → content)
 
-4. **Transcription Accuracy**
+4. **Video Frame Analysis Issues**
+   - Verify AWS credentials have `bedrock:InvokeModel` permissions
+   - Check Claude model availability in your region
+   - Monitor analysis costs with appropriate intervals
+   - Ensure video track is receiving frames before analysis begins
+
+5. **Transcription Accuracy**
    - Use appropriate Whisper model size for your use case
    - Ensure clean audio input
    - Consider language-specific models
@@ -410,6 +500,15 @@ python your-script.py --your-args
    - Use smaller Whisper models for real-time processing
    - Consider GPU acceleration for large models
 
+3. **For Video Frame Analysis:**
+   - Use longer analysis intervals (30+ seconds) to control costs
+   - Choose appropriate Claude model for your use case:
+     - Claude 3.5 Haiku for basic content moderation
+     - Claude 3.5 Sonnet for balanced performance
+     - Claude Sonnet 4 for complex analysis requiring highest accuracy
+   - Monitor Bedrock usage and costs in AWS console
+   - Consider regional model availability and latency
+
 ## Dependencies
 
 ### Core Dependencies
@@ -421,10 +520,12 @@ python your-script.py --your-args
 
 ### AI/ML Dependencies
 - `whisper` (from GitHub) - Speech recognition
+- `boto3>=1.34.0` - AWS SDK for Bedrock
 - `aws-sdk-bedrock-runtime` - Amazon Bedrock client
 - `smithy-aws-core>=0.0.1` - AWS SDK core
 - `pyaudio>=0.2.13` - Audio I/O
 - `rx>=3.2.0` - Reactive extensions
+- `Pillow>=10.0.0` - Image processing for video frame analysis
 
 ### Utility Dependencies
 - `pytz` - Timezone handling
