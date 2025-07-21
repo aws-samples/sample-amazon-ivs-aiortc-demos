@@ -532,13 +532,3 @@ class BedrockStreamManager:
         """Send a tool content end event"""
         event_data = {"event": {"contentEnd": {"promptName": self.prompt_name, "contentName": content_name}}}
         await self.send_raw_event(json.dumps(event_data))
-
-    async def start_audio_content(self):
-        """Start audio content session"""
-        content_start_event = self.CONTENT_START_EVENT % (self.prompt_name, self.audio_content_name)
-        await self.send_raw_event(content_start_event)
-
-    async def end_audio_content(self):
-        """End audio content session"""
-        content_end_event = self.CONTENT_END_EVENT % (self.prompt_name, self.audio_content_name)
-        await self.send_raw_event(content_end_event)
