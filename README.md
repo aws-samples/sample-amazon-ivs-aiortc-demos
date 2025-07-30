@@ -1,4 +1,4 @@
-# Amazon IVS Real-Time Stages with aiortc
+# Amazon-ivs-aiortc-demos
 
 A comprehensive collection of Python scripts demonstrating various Amazon IVS (Interactive Video Service) Real-Time Stages capabilities using the aiortc WebRTC library. This project showcases publishing, subscribing, transcription, and AI-powered speech-to-speech functionality.
 
