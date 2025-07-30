@@ -2,7 +2,7 @@
 
 A comprehensive collection of Python demo scripts demonstrating various Amazon IVS (Interactive Video Service) Real-Time Stages capabilities using the aiortc WebRTC library. This project showcases **publishing**, **subscribing**, **transcription**, **AI video frame analysis** and **AI-powered speech-to-speech** functionality.
 
-** This project is intended for education purposes only and not for production usage.**
+**This project is intended for education purposes only and not for production usage.**
 
 ## Table of Contents
 
@@ -632,7 +632,7 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 
 ## License
 
-This library is licensed under the MIT-0 License. See the [LICENSE](LICENCE) file.
+This library is licensed under the MIT-0 License. See the [LICENSE](./LICENCE) file.
 
 ## Support
 
