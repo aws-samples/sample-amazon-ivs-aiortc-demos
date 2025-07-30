@@ -628,15 +628,11 @@ python your-script.py --your-args
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
 ## License
 
-This project is provided as-is for educational and demonstration purposes. Please ensure compliance with AWS service terms and conditions.
+This library is licensed under the MIT-0 License. See the [LICENSE](LICENCE) file.
 
 ## Support
 
