@@ -278,7 +278,20 @@ async def join_stage_as_publisher(token: str, path_to_mp4: str, video_only: bool
     while attempt <= max_redirects:
         logger.info(f"Sending request to: {current_url} (attempt {attempt})")
 
-        response = requests.post(current_url, data=pc.localDescription.sdp, headers=headers, allow_redirects=False)  # Handle redirects manually
+        try:
+            response = requests.post(
+                current_url, 
+                data=pc.localDescription.sdp, 
+                headers=headers, 
+                allow_redirects=False,
+                timeout=10  # Add explicit timeout of 10 seconds
+            )
+        except requests.exceptions.Timeout:
+            logger.error(f"Request to {current_url} timed out after 10 seconds")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request to {current_url} failed: {e}")
+            return None
 
         if response.status_code in [301, 302, 303, 307, 308]:
             # Handle redirect manually to preserve Authorization header

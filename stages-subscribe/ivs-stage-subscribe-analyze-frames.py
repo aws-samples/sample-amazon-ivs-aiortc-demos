@@ -261,7 +261,13 @@ async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: in
         logger.info(f"Sending request to: {current_url} (attempt {attempt})")
 
         try:
-            response = requests.post(current_url, data=sdp_offer, headers=headers, allow_redirects=False)
+            response = requests.post(
+                current_url, 
+                data=sdp_offer, 
+                headers=headers, 
+                allow_redirects=False,
+                timeout=10  # Add explicit timeout of 10 seconds
+            )
 
             if response.status_code in [301, 302, 303, 307, 308]:
                 # Handle redirect manually to preserve Authorization header

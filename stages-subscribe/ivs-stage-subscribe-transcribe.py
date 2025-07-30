@@ -266,12 +266,37 @@ async def main() -> None:
 
     headers: Dict[str, str] = {"Authorization": f"Bearer {token}", "Content-Type": "application/sdp"}
 
-    response: requests.Response = requests.post(whep_url, data=pc.localDescription.sdp, headers=headers, allow_redirects=False)
+    try:
+        response: requests.Response = requests.post(
+            whep_url, 
+            data=pc.localDescription.sdp, 
+            headers=headers, 
+            allow_redirects=False,
+            timeout=10  # Add explicit timeout of 10 seconds
+        )
+    except requests.exceptions.Timeout:
+        logger.error(f"Request to {whep_url} timed out after 10 seconds")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request to {whep_url} failed: {e}")
+        return None
 
     if response.status_code in [301, 302, 307, 308]:
         redirect_url: Optional[str] = response.headers.get("Location")
         logger.info(f"Redirected to: {redirect_url}")
-        response = requests.post(redirect_url, data=pc.localDescription.sdp, headers=headers)
+        try:
+            response = requests.post(
+                redirect_url, 
+                data=pc.localDescription.sdp, 
+                headers=headers,
+                timeout=10  # Add explicit timeout of 10 seconds
+            )
+        except requests.exceptions.Timeout:
+            logger.error(f"Request to {redirect_url} timed out after 10 seconds")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request to {redirect_url} failed: {e}")
+            return None
 
     response.raise_for_status()
 
