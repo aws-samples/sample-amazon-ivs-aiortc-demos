@@ -25,7 +25,7 @@ This script integrates Amazon IVS Real-Time Stages with Amazon Nova Sonic for AI
 
 ## Installation
 
-1. **Install dependencies:**
+1. **Install dependencies (located in the root of this repository):**
 
     ```bash
     pip install -r ../requirements.txt
