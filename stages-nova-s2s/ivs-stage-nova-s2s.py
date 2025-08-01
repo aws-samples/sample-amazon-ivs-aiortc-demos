@@ -353,6 +353,7 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
             frame_count = 0
             while True:
                 frame = await track.recv()
+                nova_stream_manager.frame = frame
                 frame_count += 1
         except Exception as e:
             logger.info(f"Video track ended for participant {participant_id}: {e}")

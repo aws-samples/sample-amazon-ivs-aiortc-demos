@@ -44,8 +44,11 @@ class BedrockStreamManager:
         self.is_active = False
         self.bedrock_client = None
         self.scheduler = None
-        self.agent_tools = AgentTools()
+        self.agent_tools = AgentTools(self.region)
 
+        # frame analysis
+        self.frame = None
+        
         # Weather API configuration
         self.weather_api_key = weather_api_key
         self.weather_tool_available = self.weather_api_key is not None
@@ -102,6 +105,16 @@ class BedrockStreamManager:
                 "required": ["location"],
             }
         )
+        
+        # frame analysis tool schema
+        self.frame_analysis_schema = json.dumps(
+            {
+                "type": "object",
+                "properties": {
+                },
+                "required": [],
+            }
+        )
 
         # Build tools list dynamically based on availability
         tools_list = [
@@ -111,7 +124,14 @@ class BedrockStreamManager:
                     "description": "Get information about the current date and time",
                     "inputSchema": {"json": self.date_time_schema},
                 }
-            }
+            },
+            {
+                "toolSpec": {
+                    "name": "analyzeFrameTool",
+                    "description": "The purpose of this tool is to analyze a single image and return a description of what is contained in the image. This provides the agent the ability to have a description of the user and their environment. This includes the room they are in, surrounding objets, people, physical characteristics, clothing, etc. If the user asks the agent a question related to what the agent can see, or something about the user's physical appearance or environment - for example: 'what do you see?' or 'what do i look like?' or 'can you see me?' then use this tool to analyze a single frame from the live stream and return the results",
+                    "inputSchema": {"json": self.frame_analysis_schema},
+                }
+            },
         ]
 
         # Add weather tool if API key is available
@@ -446,6 +466,9 @@ class BedrockStreamManager:
             location = content_data.get("location", "")
 
             return self.agent_tools.getweather(location, self.weather_api_key)
+        elif tool == "analyzeframetool":
+            analysis = self.agent_tools.analyzeframe(self.frame)
+            return analysis
         else:
             return {"error": f"Unsupported tool: {tool_name}"}
 

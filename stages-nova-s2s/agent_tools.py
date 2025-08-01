@@ -3,14 +3,20 @@ import datetime
 import pytz
 import json
 import requests
+import boto3
+import io
+import base64
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class AgentTools:
 
-    def __init__(self):
-        pass
+    def __init__(self, region="us-east-1",model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"):
+        self.region = region
+        self.model_id = model_id
+        self.bedrock_client = boto3.client("bedrock-runtime", region_name=self.region)
 
     def getdateandtime(self, tz: str):
         target_timezone = ""
@@ -95,3 +101,79 @@ class AgentTools:
         except Exception as e:
             logger.error(f"Weather tool error: {e}")
             return {"error": f"Weather tool error: {str(e)}"}
+
+    def frame_to_base64(self, frame) -> str:
+        """Convert video frame to base64 encoded JPEG"""
+        try:
+            # Convert frame to PIL Image
+            img = frame.to_image()
+
+            # Convert to RGB if needed
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Save to bytes buffer as JPEG
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            buffer.seek(0)
+
+            # Encode to base64
+            img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            return img_base64
+
+        except Exception as e:
+            logger.error(f"Error converting frame to base64: {e}")
+            return None
+          
+    def analyzeframe(self, frame) -> Optional[str]:
+        """
+        Analyze a video frame using Claude
+
+        Args:
+            frame: Video frame from aiortc
+
+        Returns:
+            Analysis result string or None if failed
+        """
+        try:
+            # Convert frame to base64
+            frame_base64 = self.frame_to_base64(frame)
+            if not frame_base64:
+                return None
+
+            # Prepare the message for Claude
+            message = {
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": frame_base64}},
+                    {
+                        "type": "text",
+                        "text": "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. This could be used for content discovery, moderation, or accessibility purposes. Be specific and comprehensive.",
+                    },
+                ],
+            }
+
+            # Call Bedrock
+            logger.info(f"🔍 Analyzing frame for participant...")
+
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps({"anthropic_version": "bedrock-2023-05-31", "max_tokens": 250, "messages": [message], "temperature": 0.4}),
+            )
+
+            # Parse response
+            response_body = json.loads(response["body"].read())
+            analysis_result = response_body["content"][0]["text"]
+
+            logger.info(f"✅ Frame analysis completed for participant")
+            logger.info(f"📝 Analysis: {analysis_result}")
+
+            return {"frame_analysis": analysis_result}
+
+        except Exception as e:
+            logger.error(f"Error analyzing frame: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return None
+
