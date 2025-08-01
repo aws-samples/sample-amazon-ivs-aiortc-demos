@@ -97,7 +97,9 @@ The Nova AI assistant has access to the following tools:
 
 ### 1. Date and Time Tool
 
-**Function**: `getDateAndTimeTool`
+**Function**:
+
+`getDateAndTimeTool`
 
 **Description**:
 
@@ -114,7 +116,9 @@ Get current date and time information
 
 ### 2. Weather Tool
 
-**Function**: `getWeatherTool`
+**Function**:
+
+`getWeatherTool`
 
 **Description**:
 
