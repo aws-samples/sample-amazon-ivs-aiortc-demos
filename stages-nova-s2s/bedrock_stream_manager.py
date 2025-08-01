@@ -146,7 +146,7 @@ class BedrockStreamManager:
             tools_list.append({
                 "toolSpec": {
                     "name": "analyzeFrameTool",
-                    "description": "The purpose of this tool is to analyze a single image and return a description of what is contained in the image. This provides the agent the ability to have a description of the user and their environment. This includes the room they are in, surrounding objets, people, physical characteristics, clothing, etc. If the user asks the agent a question related to what the agent can see, or something about the user's physical appearance or environment - for example: 'what do you see?' or 'what do i look like?' or 'can you see me?' then use this tool to analyze a single frame from the live stream and return the results",
+                    "description": "The purpose of this tool is to analyze a single image and return a description of what is contained in the image. This provides you - the assistant - the ability describe the user and their environment. This includes the room they are in, surrounding objets, people, physical characteristics, clothing, etc. If the user asks the agent a question related to what the agent can see, or something about the user's physical appearance or environment - for example (but not limited to): 'look at this' or 'what do you see?' or 'what do i look like?' or 'can you see me?' then use this tool to analyze a single frame from the live stream and return the results. If a single person is identified, refer to them as 'you' and say things like 'your' or you are, not 'he', 'she' or they. Refer to the single person just as you normally would in responding to them. If multiple people are identified, avoid any gendered pronouns and say 'they' or 'them' instead.",
                     "inputSchema": {"json": self.frame_analysis_schema},
                 }
             })
@@ -295,6 +295,8 @@ class BedrockStreamManager:
             system_prompt = (
                 "You are a friendly assistant named Tiffany that is participating in a live video call."
                 "Keep your responses very brief and conversational, like a natural spoken dialog."
+                "Do not use gendered pronouns like he or she - even when using tools."
+                "If and when you analyze frames of a video, refer to a single person as 'you' and say things like 'your' or 'you are'. If multiple people are recognized, refer to them as 'they' or 'them'"
                 "Respond in 1-2 sentences maximum."
             )
 
@@ -423,7 +425,8 @@ class BedrockStreamManager:
                                 elif "contentEnd" in json_data["event"] and json_data["event"].get("contentEnd", {}).get("type") == "TOOL":
                                     logger.info("🔧 Processing tool use and sending result")
                                     # Start asynchronous tool processing - non-blocking
-                                    self.handle_tool_request(self.tool_name, self.tool_use_content, self.tool_use_id)
+                                    prompt = getattr(self, '_last_text', None)
+                                    self.handle_tool_request(self.tool_name, self.tool_use_content, self.tool_use_id, prompt)
                                     logger.info("🔧 Processing tool use asynchronously")
 
                         except json.JSONDecodeError:
@@ -433,7 +436,8 @@ class BedrockStreamManager:
                     break
                 except Exception as e:
                     logger.error(f"Error receiving Nova response: {e}")
-                    break
+                    # Continue processing instead of breaking - don't let transient errors kill the session
+                    continue
 
         except Exception as e:
             logger.error(f"Nova response processing error: {e}")
@@ -462,7 +466,7 @@ class BedrockStreamManager:
         # Stop the audio track
         await self.agent_audio_track.stop()
 
-    async def process_tool_async(self, tool_name, tool_content, current_frame=None):
+    async def process_tool_async(self, tool_name, tool_content, current_frame=None, prompt=None):
         """Process a tool call asynchronously and return the result"""
         logger.info(f"🔧 Processing tool: {tool_name}")
 
@@ -500,7 +504,7 @@ class BedrockStreamManager:
             
             try:
                 # Use the async version for non-blocking execution
-                analysis = await self.agent_tools.analyzeframe(frame_to_analyze)
+                analysis = await self.agent_tools.analyzeframe(frame_to_analyze, prompt)
                 
                 if analysis is None:
                     logger.warning("Frame analysis returned None")
@@ -517,7 +521,7 @@ class BedrockStreamManager:
         else:
             return {"error": f"Unsupported tool: {tool_name}"}
 
-    def handle_tool_request(self, tool_name, tool_content, tool_use_id):
+    def handle_tool_request(self, tool_name, tool_content, tool_use_id, prompt=None):
         """Handle a tool request asynchronously"""
         # Create a unique content name for this tool response
         tool_content_name = str(uuid.uuid4())
@@ -533,7 +537,7 @@ class BedrockStreamManager:
                 current_frame = self.frame
 
         # Create an asynchronous task for the tool execution
-        task = asyncio.create_task(self._execute_tool_and_send_result(tool_name, tool_content, tool_use_id, tool_content_name, current_frame))
+        task = asyncio.create_task(self._execute_tool_and_send_result(tool_name, tool_content, tool_use_id, tool_content_name, current_frame, prompt))
 
         # Store the task
         self.pending_tool_tasks[tool_content_name] = task
@@ -553,13 +557,13 @@ class BedrockStreamManager:
             if exception:
                 logger.error(f"Tool task failed: {str(exception)}")
 
-    async def _execute_tool_and_send_result(self, tool_name, tool_content, tool_use_id, content_name, current_frame=None):
+    async def _execute_tool_and_send_result(self, tool_name, tool_content, tool_use_id, content_name, current_frame=None, prompt=None):
         """Execute a tool and send the result"""
         try:
             logger.info(f"🔧 Starting tool execution: {tool_name}")
 
             # Process the tool
-            tool_result = await self.process_tool_async(tool_name, tool_content, current_frame)
+            tool_result = await self.process_tool_async(tool_name, tool_content, current_frame, prompt)
 
             # Send the result sequence
             await self.send_tool_start_event(content_name, tool_use_id)

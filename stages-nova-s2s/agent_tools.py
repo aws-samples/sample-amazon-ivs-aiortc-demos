@@ -126,7 +126,7 @@ class AgentTools:
             logger.error(f"Error converting frame to base64: {e}")
             return None
           
-    async def analyzeframe(self, frame, timeout=30) -> Optional[str]:
+    async def analyzeframe(self, frame, prompt=None, timeout=30) -> Optional[str]:
         """
         Analyze a video frame using Claude
 
@@ -152,13 +152,16 @@ class AgentTools:
                 return None
 
             # Prepare the message for Claude
+            bedrock_prompt = "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. This could be used for content discovery, moderation, or accessibility purposes. Be specific and comprehensive. Refer to subjects in the image as 'you' and say things like 'your' or 'you are' instead of talking about the subject in the third-person. Pretend like you know them personally and are responding directly to them conversationally instead of describing the scene to a third-party."
+            if(prompt):
+                bedrock_prompt += f"The user has specifically asked for the following information: '{prompt}'"
             message = {
                 "role": "user",
                 "content": [
                     {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": frame_base64}},
                     {
                         "type": "text",
-                        "text": "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. This could be used for content discovery, moderation, or accessibility purposes. Be specific and comprehensive.",
+                        "text": bedrock_prompt,
                     },
                 ],
             }
