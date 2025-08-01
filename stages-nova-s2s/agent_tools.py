@@ -6,6 +6,7 @@ import requests
 import boto3
 import io
 import base64
+import asyncio
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -125,20 +126,29 @@ class AgentTools:
             logger.error(f"Error converting frame to base64: {e}")
             return None
           
-    def analyzeframe(self, frame) -> Optional[str]:
+    async def analyzeframe(self, frame, timeout=30) -> Optional[str]:
         """
         Analyze a video frame using Claude
 
         Args:
             frame: Video frame from aiortc
+            timeout: Timeout in seconds for the analysis (default: 30)
 
         Returns:
             Analysis result string or None if failed
         """
         try:
-            # Convert frame to base64
-            frame_base64 = self.frame_to_base64(frame)
+            # Convert frame to base64 (CPU intensive - run in thread pool)
+            loop = asyncio.get_event_loop()
+            
+            # Add timeout for frame conversion
+            frame_base64 = await asyncio.wait_for(
+                loop.run_in_executor(None, self.frame_to_base64, frame),
+                timeout=10  # 10 seconds for frame conversion
+            )
+            
             if not frame_base64:
+                logger.warning("Frame to base64 conversion failed")
                 return None
 
             # Prepare the message for Claude
@@ -153,12 +163,24 @@ class AgentTools:
                 ],
             }
 
-            # Call Bedrock
+            # Call Bedrock (I/O bound - run in thread pool)
             logger.info(f"🔍 Analyzing frame for participant...")
 
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps({"anthropic_version": "bedrock-2023-05-31", "max_tokens": 250, "messages": [message], "temperature": 0.4}),
+            def bedrock_call():
+                return self.bedrock_client.invoke_model(
+                    modelId=self.model_id,
+                    body=json.dumps({
+                        "anthropic_version": "bedrock-2023-05-31", 
+                        "max_tokens": 100, 
+                        "messages": [message], 
+                        "temperature": 0.4
+                    }),
+                )
+
+            # Add timeout for Bedrock API call
+            response = await asyncio.wait_for(
+                loop.run_in_executor(None, bedrock_call),
+                timeout=timeout - 10  # Reserve 10 seconds for frame conversion
             )
 
             # Parse response
@@ -170,10 +192,12 @@ class AgentTools:
 
             return {"frame_analysis": analysis_result}
 
+        except asyncio.TimeoutError:
+            logger.error(f"Frame analysis timed out after {timeout} seconds")
+            return {"error": f"Frame analysis timed out after {timeout} seconds"}
         except Exception as e:
             logger.error(f"Error analyzing frame: {e}")
             import traceback
-
             traceback.print_exc()
             return None
 

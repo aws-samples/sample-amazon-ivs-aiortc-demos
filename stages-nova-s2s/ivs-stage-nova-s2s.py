@@ -393,9 +393,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description="IVS Stage Publisher/Subscriber with Nova Speech-to-Speech")
     parser.add_argument("--token", required=True, help="IVS stage participant token")
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
+    
     # Nova options
-    parser.add_argument("--nova-model", default="amazon.nova-sonic-v1:0", help="Nova model ID")
+    parser.add_argument("--nova-model-id", default="amazon.nova-sonic-v1:0", help="Nova model ID")
     parser.add_argument("--nova-region", default="us-east-1", help="AWS region for Nova")
+    
+    # Frame analysis options
+    parser.add_argument("--disable-frame-analysis", action="store_true", help="Disable video frame analysis (default: enabled)")
+    parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
+    parser.add_argument(
+        "--bedrock-model-id",
+        default="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
+    )
 
     return parser.parse_args()
 
@@ -404,10 +414,16 @@ async def main():
     """Main function that handles both publishing and subscribing with Nova speech-to-speech"""
     args = parse_args()
 
+    # Handle frame analysis flag logic (enabled by default, disabled if --disable-frame-analysis is used)
+    enable_frame_analysis = not args.disable_frame_analysis
+
     logger.info("🎬 Starting IVS Stage Publisher/Subscriber with Nova Speech-to-Speech")
     logger.info(f"🔑 Using token: {args.token[:50]}... (truncated)")
-    logger.info(f"🤖 Nova model: {args.nova_model}")
+    logger.info(f"🤖 Nova model: {args.nova_model_id}")
     logger.info(f"🌍 Nova region: {args.nova_region}")
+    logger.info(f"🔍 Frame analysis: {'enabled' if enable_frame_analysis else 'disabled'}")
+    logger.info(f"🧠 Analysis model: {args.bedrock_model_id}")
+    logger.info(f"🌍 Analysis region: {args.bedrock_region}")
     token_payload = parse_jwt(args.token)
 
     if not token_payload:
@@ -455,9 +471,12 @@ async def main():
         nova_stream_manager = BedrockStreamManager(
             agent_audio_track=agent_audio_track, 
             agent_video_track=agent_video_track, 
-            model_id=args.nova_model, 
+            model_id=args.nova_model_id, 
             region=args.nova_region,
-            weather_api_key=os.getenv("WEATHER_API_KEY")
+            weather_api_key=os.getenv("WEATHER_API_KEY"),
+            enable_frame_analysis=enable_frame_analysis,
+            analysis_model_id=args.bedrock_model_id,
+            analysis_region=args.bedrock_region
         )
         # fmt:on
         await nova_stream_manager.initialize_stream()

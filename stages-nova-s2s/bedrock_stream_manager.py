@@ -31,6 +31,9 @@ class BedrockStreamManager:
         region="us-east-1",
         input_sample_rate=16000,
         weather_api_key=None,
+        enable_frame_analysis=True,
+        analysis_model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        analysis_region="us-east-1",
     ):
         self.model_id = model_id
         self.region = region
@@ -44,7 +47,12 @@ class BedrockStreamManager:
         self.is_active = False
         self.bedrock_client = None
         self.scheduler = None
-        self.agent_tools = AgentTools(self.region)
+        
+        # Frame analysis configuration
+        self.enable_frame_analysis = enable_frame_analysis
+        self.analysis_model_id = analysis_model_id
+        self.analysis_region = analysis_region
+        self.agent_tools = AgentTools(self.analysis_region, self.analysis_model_id)
 
         # frame analysis
         self.frame = None
@@ -57,6 +65,12 @@ class BedrockStreamManager:
             logger.warning("⚠️  `weather_api_key` not found. Weather tool will not be available.")
         else:
             logger.info("🌤️  Weather tool is available")
+
+        # Frame analysis configuration logging
+        if self.enable_frame_analysis:
+            logger.info(f"🔍 Frame analysis is enabled (model: {self.analysis_model_id}, region: {self.analysis_region})")
+        else:
+            logger.info("🔍 Frame analysis is disabled")
 
         # Session information
         self.prompt_name = str(uuid.uuid4())
@@ -125,14 +139,17 @@ class BedrockStreamManager:
                     "inputSchema": {"json": self.date_time_schema},
                 }
             },
-            {
+        ]
+
+        # Add frame analysis tool if enabled
+        if self.enable_frame_analysis:
+            tools_list.append({
                 "toolSpec": {
                     "name": "analyzeFrameTool",
                     "description": "The purpose of this tool is to analyze a single image and return a description of what is contained in the image. This provides the agent the ability to have a description of the user and their environment. This includes the room they are in, surrounding objets, people, physical characteristics, clothing, etc. If the user asks the agent a question related to what the agent can see, or something about the user's physical appearance or environment - for example: 'what do you see?' or 'what do i look like?' or 'can you see me?' then use this tool to analyze a single frame from the live stream and return the results",
                     "inputSchema": {"json": self.frame_analysis_schema},
                 }
-            },
-        ]
+            })
 
         # Add weather tool if API key is available
         if self.weather_tool_available:
@@ -151,7 +168,7 @@ class BedrockStreamManager:
             "event": {
                 "sessionStart": {
                     "inferenceConfiguration": {
-                        "maxTokens": 1024,
+                        "maxTokens": 512,
                         "topP": 0.9,
                         "temperature": 0.7
                     }
@@ -445,7 +462,7 @@ class BedrockStreamManager:
         # Stop the audio track
         await self.agent_audio_track.stop()
 
-    async def process_tool_async(self, tool_name, tool_content):
+    async def process_tool_async(self, tool_name, tool_content, current_frame=None):
         """Process a tool call asynchronously and return the result"""
         logger.info(f"🔧 Processing tool: {tool_name}")
 
@@ -467,8 +484,36 @@ class BedrockStreamManager:
 
             return self.agent_tools.getweather(location, self.weather_api_key)
         elif tool == "analyzeframetool":
-            analysis = self.agent_tools.analyzeframe(self.frame)
-            return analysis
+            # Check if frame analysis is enabled
+            if not self.enable_frame_analysis:
+                logger.warning("Frame analysis tool called but frame analysis is disabled")
+                return {"error": "Frame analysis is disabled"}
+            
+            # Use the captured frame or fall back to current frame
+            frame_to_analyze = current_frame if current_frame is not None else self.frame
+            
+            if frame_to_analyze is None:
+                logger.warning("No video frame available for analysis")
+                return {"error": "No video frame available for analysis"}
+            
+            logger.info(f"🔍 Starting frame analysis with {'captured' if current_frame is not None else 'current'} frame")
+            
+            try:
+                # Use the async version for non-blocking execution
+                analysis = await self.agent_tools.analyzeframe(frame_to_analyze)
+                
+                if analysis is None:
+                    logger.warning("Frame analysis returned None")
+                    return {"error": "Frame analysis failed - no result returned"}
+                
+                logger.info("🔍 Frame analysis completed successfully")
+                return analysis
+                
+            except Exception as e:
+                logger.error(f"Frame analysis error: {e}")
+                import traceback
+                traceback.print_exc()
+                return {"error": f"Frame analysis failed: {str(e)}"}
         else:
             return {"error": f"Unsupported tool: {tool_name}"}
 
@@ -477,8 +522,18 @@ class BedrockStreamManager:
         # Create a unique content name for this tool response
         tool_content_name = str(uuid.uuid4())
 
+        # Capture current frame for analysis tools to ensure consistency
+        current_frame = None
+        if tool_name.lower() == "analyzeframetool" and self.frame is not None:
+            # Create a copy of the frame to avoid issues with frame updates during processing
+            try:
+                current_frame = self.frame.copy() if hasattr(self.frame, 'copy') else self.frame
+            except Exception as e:
+                logger.warning(f"Could not copy frame, using reference: {e}")
+                current_frame = self.frame
+
         # Create an asynchronous task for the tool execution
-        task = asyncio.create_task(self._execute_tool_and_send_result(tool_name, tool_content, tool_use_id, tool_content_name))
+        task = asyncio.create_task(self._execute_tool_and_send_result(tool_name, tool_content, tool_use_id, tool_content_name, current_frame))
 
         # Store the task
         self.pending_tool_tasks[tool_content_name] = task
@@ -498,13 +553,13 @@ class BedrockStreamManager:
             if exception:
                 logger.error(f"Tool task failed: {str(exception)}")
 
-    async def _execute_tool_and_send_result(self, tool_name, tool_content, tool_use_id, content_name):
+    async def _execute_tool_and_send_result(self, tool_name, tool_content, tool_use_id, content_name, current_frame=None):
         """Execute a tool and send the result"""
         try:
             logger.info(f"🔧 Starting tool execution: {tool_name}")
 
             # Process the tool
-            tool_result = await self.process_tool_async(tool_name, tool_content)
+            tool_result = await self.process_tool_async(tool_name, tool_content, current_frame)
 
             # Send the result sequence
             await self.send_tool_start_event(content_name, tool_use_id)
