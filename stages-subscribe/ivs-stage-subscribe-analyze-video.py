@@ -597,9 +597,9 @@ def parse_args():
     parser.add_argument("--token", required=True, help="IVS stage participant token")
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
     parser.add_argument("--analysis-duration", type=float, default=10.0, help="Duration in seconds for video recording before analysis (default: 10.0)")
-    parser.add_argument("--aws-region", default="us-west-2", help="AWS region for Bedrock service (default: us-west-2)")
+    parser.add_argument("--bedrock-region", default="us-west-2", help="AWS region for Bedrock service (default: us-west-2)")
     parser.add_argument(
-        "--model-id",
+        "--bedrock-model-id",
         default="us.twelvelabs.pegasus-1-2-v1:0",
         help="Bedrock model ID for video analysis (default: us.twelvelabs.pegasus-1-2-v1:0)",
     )
@@ -637,7 +637,7 @@ async def main():
     analyzer = None
     if not args.disable_analysis:
         try:
-            analyzer = VideoAnalyzer(analysis_duration=args.analysis_duration, region=args.aws_region, model_id=args.model_id)
+            analyzer = VideoAnalyzer(analysis_duration=args.analysis_duration, region=args.bedrock_region, model_id=args.bedrock_model_id)
             logger.info(f"🤖 Video analysis enabled (recording duration: {args.analysis_duration}s)")
         except Exception as e:
             logger.error(f"❌ Failed to initialize VideoAnalyzer: {e}")

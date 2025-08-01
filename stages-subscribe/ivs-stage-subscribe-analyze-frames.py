@@ -415,9 +415,9 @@ def parse_args():
     parser.add_argument("--token", required=True, help="IVS stage participant token")
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
     parser.add_argument("--analysis-interval", type=float, default=30.0, help="Time in seconds between frame analyses (default: 30.0)")
-    parser.add_argument("--aws-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
+    parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
     parser.add_argument(
-        "--model-id",
+        "--bedrock-model-id",
         default="us.anthropic.claude-sonnet-4-20250514-v1:0",
         help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
     )
@@ -455,7 +455,7 @@ async def main():
     analyzer = None
     if not args.disable_analysis:
         try:
-            analyzer = VideoFrameAnalyzer(analysis_interval=args.analysis_interval, region=args.aws_region, model_id=args.model_id)
+            analyzer = VideoFrameAnalyzer(analysis_interval=args.analysis_interval, region=args.bedrock_region, model_id=args.bedrock_model_id)
             logger.info(f"🤖 Video frame analysis enabled (every {args.analysis_interval}s)")
         except Exception as e:
             logger.error(f"❌ Failed to initialize VideoFrameAnalyzer: {e}")

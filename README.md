@@ -298,8 +298,8 @@ python ivs-stage-subscribe-analyze-frames.py \
 -   `--token`: JWT participant token with subscribe capabilities (required)
 -   `--subscribe-to`: Participant ID to subscribe to (required)
 -   `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
--   `--aws-region`: AWS region for Bedrock service (default: "us-east-1")
--   `--model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+-   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+-   `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
 -   `--disable-analysis`: Disable video frame analysis, just subscribe to video (optional flag)
 
 **Supported Models:**
@@ -351,8 +351,8 @@ python ivs-stage-subscribe-analyze-video.py \
 -   `--token`: JWT participant token with subscribe capabilities (required)
 -   `--subscribe-to`: Participant ID to subscribe to (required)
 -   `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
--   `--aws-region`: AWS region for Bedrock service (default: "us-west-2")
--   `--model-id`: Bedrock model ID for analysis (default: "us.twelvelabs.pegasus-1-2-v1:0")
+-   `--bedrock-region`: AWS region for Bedrock service (default: "us-west-2")
+-   `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.twelvelabs.pegasus-1-2-v1:0")
 -   `--disable-analysis`: Disable video analysis, just subscribe to video (optional flag)
 
 ### Stages Nova Speech-to-Speech
@@ -371,6 +371,9 @@ A comprehensive script that combines IVS Real-Time Stages with Amazon Nova Sonic
 -   Audio resampling and format conversion
 -   WebRTC track management for both publishing and subscribing
 -   Dynamic audio visualization with gradient colormaps
+-   AI-powered video frame analysis using Amazon Bedrock Claude models
+-   Built-in tools for date/time, weather, and visual analysis
+-   Configurable frame analysis with multiple Claude model options
 
 **Usage:**
 
@@ -385,16 +388,26 @@ python ivs-stage-nova-s2s.py \
 
 -   `--token`: JWT participant token with both publish and subscribe capabilities (required)
 -   `--subscribe-to`: Participant ID to subscribe to (required)
--   `--nova-model`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
+-   `--nova-model-id`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
 -   `--nova-region`: AWS region for Nova service (default: "us-east-1")
+-   `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
+-   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+-   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
 
 **Key Components:**
 
 1. **AgentAudioTrack**: Custom audio track for streaming Nova responses
-2. **WaveformVideoTrack**: Dynamic waveform visualization
+2. **AgentVideoTrack**: Dynamic waveform visualization with thinking states
 3. **BedrockStreamManager**: Manages bidirectional Nova Sonic streaming
 4. **Audio Processing**: Handles resampling between IVS (48kHz) and Nova (16kHz)
-5. **Tool Support**: Built-in tools for date/time and weather information (requires `WEATHER_API_KEY` environment variable)
+5. **Tool Support**: Built-in tools for date/time, weather, and video frame analysis
+6. **Frame Analysis**: Non-blocking AI-powered video frame analysis using Claude models
+
+**Available Tools:**
+
+-   **Date/Time Tool**: Get current date and time information with timezone support
+-   **Weather Tool**: Get current weather and 5-day forecast (requires `WEATHER_API_KEY`)
+-   **Frame Analysis Tool**: Analyze video frames for visual assistance and content description
 
 ### Utility Scripts
 
@@ -449,14 +462,14 @@ python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
 python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
-  --model-id "anthropic.claude-3-5-haiku-20241022-v1:0" \
+  --bedrock-model-id "anthropic.claude-3-5-haiku-20241022-v1:0" \
   --analysis-interval 60.0
 
 # Analysis in different AWS region
 python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
-  --aws-region "eu-west-1"
+  --bedrock-region "eu-west-1"
 
 # Subscribe to video without analysis (testing connectivity)
 python stages-subscribe/ivs-stage-subscribe-analyze-frames.py \
@@ -483,11 +496,25 @@ python stages-subscribe/ivs-stage-subscribe-analyze-video.py \
 ### AI Speech-to-Speech Example
 
 ```bash
-# Start Nova Sonic conversation
+# Start Nova Sonic conversation with frame analysis
 python stages-nova-s2s/ivs-stage-nova-s2s.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
-  --nova-model "amazon.nova-sonic-v1:0" \
+  --subscribe-to "participant123" \
+  --nova-model-id "amazon.nova-sonic-v1:0" \
   --nova-region "us-east-1"
+
+# Nova conversation without frame analysis
+python stages-nova-s2s/ivs-stage-nova-s2s.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --disable-frame-analysis
+
+# Nova conversation with custom Bedrock model and region
+python stages-nova-s2s/ivs-stage-nova-s2s.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --bedrock-model-id "anthropic.claude-3-5-sonnet-20241022-v2:0" \
+  --bedrock-region "us-west-2"
 ```
 
 ### Publish and Subscribe Example
