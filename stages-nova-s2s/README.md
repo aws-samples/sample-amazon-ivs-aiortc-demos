@@ -98,7 +98,7 @@ The Nova AI assistant has access to the following tools:
 ### 1. Date and Time Tool
 
 **Function**: `getDateAndTimeTool`
-**Description**: Get current date and time information
+**Description**: Get current date and time information  
 **Parameters**:
 
 -   `timezone` (optional): Timezone for the date/time (defaults to local)
@@ -111,7 +111,7 @@ The Nova AI assistant has access to the following tools:
 ### 2. Weather Tool
 
 **Function**: `getWeatherTool`
-**Description**: Get current weather information and 5-day forecast for any location
+**Description**: Get current weather information and 5-day forecast for any location  
 **Parameters**:
 
 -   `location` (required): City name, postal code, or coordinates
@@ -141,7 +141,7 @@ The Nova AI assistant has access to the following tools:
 ### 3. Frame Analysis Tool
 
 **Function**: `analyzeFrameTool`
-**Description**: Analyze video frames from the live stream using AI
+**Description**: Analyze video frames from the live stream using AI  
 **Parameters**: None (uses current video frame)
 
 **Requirements**:
