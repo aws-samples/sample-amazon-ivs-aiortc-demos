@@ -17,7 +17,7 @@ class AgentVideoTrack(VideoStreamTrack):
     and a pulsing animation when the agent is thinking/processing
     """
 
-    def __init__(self, width=640, height=360, fps=30):
+    def __init__(self, width=1280, height=720, fps=30):
         super().__init__()
         self.width = width
         self.height = height
@@ -33,6 +33,8 @@ class AgentVideoTrack(VideoStreamTrack):
         self.is_thinking = False
         self.thinking_phase = 0.0  # Phase for thinking animation (0-1)
         self.thinking_speed = 2.0  # Speed of thinking animation
+        self.spin_phase = 0.0  # Phase for spinning animation (0-2π)
+        self.spin_speed = 1.0  # Speed of spinning animation
 
         # Circle properties
         self.base_radius = min(width, height) // 6  # Base circle size
@@ -62,6 +64,61 @@ class AgentVideoTrack(VideoStreamTrack):
         else:
             self.is_thinking = thinking
 
+    def _apply_smooth_circle(self, frame_array, center_x, center_y, radius, color, alpha=1.0, smoothness=2.0):
+        """Apply a very smooth antialiased circle with enhanced edge smoothing"""
+        y, x = np.ogrid[:self.height, :self.width]
+        distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        
+        # Create ultra-smooth antialiased edges with wider transition zone
+        transition_width = smoothness
+        edge_alpha = np.clip((radius + transition_width - distance) / transition_width, 0, 1) * alpha
+        
+        # Apply smooth blending
+        for i in range(3):
+            current_values = frame_array[:, :, i].astype(np.float32)
+            new_values = current_values * (1 - edge_alpha) + color[i] * edge_alpha
+            frame_array[:, :, i] = np.clip(new_values, 0, 255).astype(np.uint8)
+
+    def _draw_spinning_donut(self, frame_array, center_x, center_y, inner_radius, outer_radius):
+        """Draw a spinning gradient donut around the thinking circle"""
+        self.spin_phase += (self.spin_speed * 2 * np.pi) / self.fps
+        if self.spin_phase > 2 * np.pi:
+            self.spin_phase -= 2 * np.pi
+            
+        y, x = np.ogrid[:self.height, :self.width]
+        distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+        
+        # Create donut mask
+        donut_mask = (distance >= inner_radius) & (distance <= outer_radius)
+        
+        # Calculate angle for each pixel
+        angle = np.arctan2(y - center_y, x - center_x) + np.pi  # 0 to 2π
+        
+        # Create spinning gradient effect
+        gradient_phase = (angle + self.spin_phase) % (2 * np.pi)
+        gradient_intensity = (np.sin(gradient_phase * 2) + 1) / 2  # 0-1 range with 2 cycles
+        
+        # Add radial gradient for donut thickness
+        donut_thickness = outer_radius - inner_radius
+        radial_pos = (distance - inner_radius) / donut_thickness
+        radial_gradient = 1.0 - np.abs(radial_pos - 0.5) * 2  # Peak at center of donut
+        
+        # Combine gradients
+        final_intensity = gradient_intensity * radial_gradient * 0.6
+        
+        # Apply smooth edges to donut
+        inner_edge = np.clip((distance - inner_radius + 1) / 2, 0, 1)
+        outer_edge = np.clip((outer_radius + 1 - distance) / 2, 0, 1)
+        edge_mask = inner_edge * outer_edge
+        
+        final_alpha = final_intensity * edge_mask
+        
+        # Apply the spinning donut
+        for i in range(3):
+            current_values = frame_array[:, :, i][donut_mask].astype(np.float32)
+            new_values = current_values + self.thinking_glow_color[i] * final_alpha[donut_mask]
+            frame_array[:, :, i][donut_mask] = np.clip(new_values, 0, 255).astype(np.uint8)
+
     def _generate_circle_frame(self):
         """Generate a frame with a throbbing circle or thinking animation"""
         try:
@@ -73,83 +130,61 @@ class AgentVideoTrack(VideoStreamTrack):
             center_y = self.height // 2
 
             if self.is_thinking:
-                # Thinking animation: pulsing circle with different color
+                # Thinking animation: pulsing circle with spinning dots
                 self.thinking_phase += self.thinking_speed / self.fps
                 if self.thinking_phase > 1.0:
                     self.thinking_phase = 0.0
 
                 # Create a smooth pulsing effect using sine wave
                 pulse_intensity = (np.sin(self.thinking_phase * 2 * np.pi) + 1) / 2  # 0-1 range
-                current_radius = int(self.base_radius + pulse_intensity * 30)
+                current_radius = self.base_radius + pulse_intensity * 20
 
-                # Use thinking colors
-                circle_color = self.thinking_color
-                glow_color = self.thinking_glow_color
-
-                # Create coordinate grids
-                y, x = np.ogrid[: self.height, : self.width]
+                # Create outer glow with smooth falloff
+                glow_radius = current_radius + 30
+                y, x = np.ogrid[:self.height, :self.width]
                 distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-
-                # Create multiple concentric rings for thinking effect
-                for ring in range(3):
-                    ring_radius = current_radius + (ring * 15)
-                    ring_width = 8
-                    ring_mask = (distance <= ring_radius) & (distance > ring_radius - ring_width)
-
-                    # Fade rings based on pulse phase
-                    ring_alpha = pulse_intensity * (1.0 - ring * 0.3)
-                    ring_alpha = max(0.1, ring_alpha)
-
-                    for i in range(3):
-                        # Ensure ring_alpha is applied correctly to avoid float errors
-                        ring_color_value = int(circle_color[i] * ring_alpha)
-                        frame_array[:, :, i][ring_mask] = ring_color_value
-
-                # Main thinking circle with gradient
-                circle_mask = distance <= current_radius
-                circle_intensity = 1.0 - (distance / current_radius)
-                circle_intensity = np.clip(circle_intensity, 0, 1)
-
-                # Apply main circle with pulsing intensity
-                main_alpha = 0.6 + (pulse_intensity * 0.4)  # 0.6-1.0 range
+                
+                # Smooth glow falloff
+                glow_mask = distance <= glow_radius
+                glow_intensity = np.exp(-(distance - current_radius) / 15) * 0.4 * pulse_intensity
+                glow_intensity = np.clip(glow_intensity, 0, 1)
+                
                 for i in range(3):
-                    # Ensure proper type conversion to avoid float errors
-                    main_color_values = (circle_color[i] * circle_intensity[circle_mask] * main_alpha).astype(np.uint8)
-                    frame_array[:, :, i][circle_mask] = main_color_values
+                    current_values = frame_array[:, :, i][glow_mask].astype(np.float32)
+                    new_values = current_values + self.thinking_glow_color[i] * glow_intensity[glow_mask]
+                    frame_array[:, :, i][glow_mask] = np.clip(new_values, 0, 255).astype(np.uint8)
+
+                # Main thinking circle with ultra-smooth antialiasing
+                main_alpha = 0.8 + (pulse_intensity * 0.2)
+                self._apply_smooth_circle(frame_array, center_x, center_y, current_radius, self.thinking_color, alpha=main_alpha, smoothness=3.0)
+
+                # Add spinning donut closer to the circle
+                donut_inner = current_radius + 8
+                donut_outer = current_radius + 18
+                self._draw_spinning_donut(frame_array, center_x, center_y, donut_inner, donut_outer)
 
             else:
-                # Normal speaking mode: audio-reactive throb
+                # Normal speaking mode: audio-reactive throb with smooth edges
                 throb_amount = self.audio_level * self.max_throb
-                current_radius = int(self.base_radius + throb_amount)
-
-                # Use normal speaking colors
-                circle_color = self.circle_color
-                glow_color = self.glow_color
+                current_radius = self.base_radius + throb_amount
 
                 # Create coordinate grids
-                y, x = np.ogrid[: self.height, : self.width]
+                y, x = np.ogrid[:self.height, :self.width]
                 distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
 
-                # Create glow effect (outer ring)
-                glow_radius = current_radius + 20
-                glow_mask = (distance <= glow_radius) & (distance > current_radius - 10)
-                glow_intensity = 1.0 - (distance - current_radius + 10) / 30.0
+                # Create smooth glow effect
+                glow_radius = current_radius + 25
+                glow_intensity = np.exp(-(distance - current_radius) / 12) * 0.5
                 glow_intensity = np.clip(glow_intensity, 0, 1)
+                glow_mask = distance <= glow_radius
 
-                # Apply glow
                 for i in range(3):
-                    frame_array[:, :, i][glow_mask] = (glow_color[i] * glow_intensity[glow_mask] * 0.3).astype(np.uint8)
+                    current_values = frame_array[:, :, i][glow_mask].astype(np.float32)
+                    new_values = current_values + self.glow_color[i] * glow_intensity[glow_mask]
+                    frame_array[:, :, i][glow_mask] = np.clip(new_values, 0, 255).astype(np.uint8)
 
-                # Create main circle
-                circle_mask = distance <= current_radius
-
-                # Add some gradient to the circle
-                circle_intensity = 1.0 - (distance / current_radius)
-                circle_intensity = np.clip(circle_intensity, 0, 1)
-
-                # Apply circle color with gradient
-                for i in range(3):
-                    frame_array[:, :, i][circle_mask] = (circle_color[i] * circle_intensity[circle_mask]).astype(np.uint8)
+                # Create main circle with ultra-smooth antialiasing
+                self._apply_smooth_circle(frame_array, center_x, center_y, current_radius, self.circle_color, alpha=0.9, smoothness=3.0)
 
             return frame_array
 
