@@ -393,6 +393,7 @@ python ivs-stage-nova-s2s.py \
 -   `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
 -   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
 -   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+-   `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
 
 **Key Components:**
 
@@ -515,6 +516,12 @@ python stages-nova-s2s/ivs-stage-nova-s2s.py \
   --subscribe-to "participant123" \
   --bedrock-model-id "anthropic.claude-3-5-sonnet-20241022-v2:0" \
   --bedrock-region "us-west-2"
+
+# Nova conversation with fast connection setup
+python stages-nova-s2s/ivs-stage-nova-s2s.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --ice-timeout 1
 ```
 
 ### Publish and Subscribe Example
@@ -600,19 +607,26 @@ python your-script.py --your-args
 
 ### Performance Optimization
 
-1. **For Nova Sonic:**
+1. **Connection Speed:**
+
+    - Use `--ice-timeout 1` for faster WebRTC connection establishment (default)
+    - Original WebRTC ICE timeout is 5 seconds, optimized to 1 second for better user experience
+    - Increase timeout if experiencing connection issues in poor network conditions
+    - This optimization reduces startup time from ~11 seconds to ~3 seconds
+
+2. **For Nova Sonic:**
 
     - Use consistent 1ms delays between audio chunks
     - Implement proper buffering strategies
     - Monitor memory usage during long sessions
 
-2. **For Transcription:**
+3. **For Transcription:**
 
     - Choose appropriate chunk duration (5-10 seconds)
     - Use smaller Whisper models for real-time processing
     - Consider GPU acceleration for large models
 
-3. **For Video Frame Analysis:**
+4. **For Video Frame Analysis:**
     - Use longer analysis intervals (30+ seconds) to control costs
     - Choose appropriate Claude model for your use case:
         - Claude 3.5 Haiku for basic content moderation
