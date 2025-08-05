@@ -283,9 +283,15 @@ async def subscribe_to_participant(token: str, participant_id: str, nova_stream_
     # Audio processing state
     resampler = None
 
+    # Connection state tracking
+    pc._should_exit = False
+
     @pc.on("connectionstatechange")
     def on_connectionstatechange():
         logger.info(f"🔗 Connection state changed to: {pc.connectionState}")
+        if pc.connectionState == "closed":
+            logger.info(f"🚪 Participant {participant_id} has left - marking for graceful exit")
+            pc._should_exit = True
 
     @pc.on("iceconnectionstatechange")
     def on_iceconnectionstatechange():
@@ -555,6 +561,12 @@ async def main():
             logger.info("🎙️  Speak and Nova will respond through the IVS stage!")
             while True:
                 await asyncio.sleep(1)  # Keep the event loop running
+
+                # Check if any connection is marked for exit (participant left)
+                for pc in connections:
+                    if hasattr(pc, "_should_exit") and pc._should_exit:
+                        logger.info("🚪 Participant has left the conversation - exiting gracefully")
+                        return
         except KeyboardInterrupt:
             logger.info("🛑 Shutting down...")
         finally:
