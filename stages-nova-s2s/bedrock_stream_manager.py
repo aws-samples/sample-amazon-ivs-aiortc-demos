@@ -47,7 +47,7 @@ class BedrockStreamManager:
         self.is_active = False
         self.bedrock_client = None
         self.scheduler = None
-        
+
         # Frame analysis configuration
         self.enable_frame_analysis = enable_frame_analysis
         self.analysis_model_id = analysis_model_id
@@ -56,7 +56,7 @@ class BedrockStreamManager:
 
         # frame analysis
         self.frame = None
-        
+
         # Weather API configuration
         self.weather_api_key = weather_api_key
         self.weather_tool_available = self.weather_api_key is not None
@@ -119,13 +119,12 @@ class BedrockStreamManager:
                 "required": ["location"],
             }
         )
-        
+
         # frame analysis tool schema
         self.frame_analysis_schema = json.dumps(
             {
                 "type": "object",
-                "properties": {
-                },
+                "properties": {},
                 "required": [],
             }
         )
@@ -143,13 +142,15 @@ class BedrockStreamManager:
 
         # Add frame analysis tool if enabled
         if self.enable_frame_analysis:
-            tools_list.append({
-                "toolSpec": {
-                    "name": "analyzeFrameTool",
-                    "description": "The purpose of this tool is to analyze a single image and return a description of what is contained in the image. This provides you - the assistant - the ability describe the user and their environment. This includes the room they are in, surrounding objets, people, physical characteristics, clothing, etc. If the user asks the agent a question related to what the agent can see, or something about the user's physical appearance or environment - for example (but not limited to): 'look at this' or 'what do you see?' or 'what do i look like?' or 'can you see me?' then use this tool to analyze a single frame from the live stream and return the results. If a single person is identified, refer to them as 'you' and say things like 'your' or you are, not 'he', 'she' or they. Refer to the single person just as you normally would in responding to them. If multiple people are identified, avoid any gendered pronouns and say 'they' or 'them' instead.",
-                    "inputSchema": {"json": self.frame_analysis_schema},
+            tools_list.append(
+                {
+                    "toolSpec": {
+                        "name": "analyzeFrameTool",
+                        "description": "The purpose of this tool is to analyze a single image and return a description of what is contained in the image. This provides you - the assistant - the ability describe the user and their environment. This includes the room they are in, surrounding objets, people, physical characteristics, clothing, etc. If the user asks the agent a question related to what the agent can see, or something about the user's physical appearance or environment - for example (but not limited to): 'look at this' or 'what do you see?' or 'what do i look like?' or 'can you see me?' then use this tool to analyze a single frame from the live stream and return the results. If a single person is identified, refer to them as 'you' and say things like 'your' or you are, not 'he', 'she' or they. Refer to the single person just as you normally would in responding to them. If multiple people are identified, avoid any gendered pronouns and say 'they' or 'them' instead.",
+                        "inputSchema": {"json": self.frame_analysis_schema},
+                    }
                 }
-            })
+            )
 
         # Add weather tool if API key is available
         if self.weather_tool_available:
@@ -394,6 +395,12 @@ class BedrockStreamManager:
                                     text_content = json_data["event"]["textOutput"]["content"]
                                     role = json_data["event"]["textOutput"]["role"]
 
+                                    # Check for interruption event
+                                    if self._is_interruption_event(text_content):
+                                        logger.info("🛑 User interruption detected - stopping agent speech")
+                                        await self._handle_interruption()
+                                        continue
+
                                     # Simple thinking state management based on role
                                     if role == "USER":
                                         self.agent_video_track.set_thinking_state(True)
@@ -425,7 +432,7 @@ class BedrockStreamManager:
                                 elif "contentEnd" in json_data["event"] and json_data["event"].get("contentEnd", {}).get("type") == "TOOL":
                                     logger.info("🔧 Processing tool use and sending result")
                                     # Start asynchronous tool processing - non-blocking
-                                    prompt = getattr(self, '_last_text', None)
+                                    prompt = getattr(self, "_last_text", None)
                                     self.handle_tool_request(self.tool_name, self.tool_use_content, self.tool_use_id, prompt)
                                     logger.info("🔧 Processing tool use asynchronously")
 
@@ -441,6 +448,30 @@ class BedrockStreamManager:
 
         except Exception as e:
             logger.error(f"Nova response processing error: {e}")
+
+    def _is_interruption_event(self, text_content):
+        """Check if the text content is an interruption event"""
+        try:
+            # Try to parse as JSON
+            parsed = json.loads(text_content.strip())
+            return isinstance(parsed, dict) and parsed.get("interrupted") is True
+        except (json.JSONDecodeError, AttributeError):
+            # Not JSON or doesn't match interruption pattern
+            return False
+
+    async def _handle_interruption(self):
+        """Handle user interruption by stopping agent speech"""
+        try:
+            # Stop the agent audio track immediately
+            await self.agent_audio_track.stop_current_audio()
+
+            # Set video track to idle state (not thinking, not speaking)
+            self.agent_video_track.set_thinking_state(False)
+
+            logger.info("🛑 Agent speech stopped due to user interruption")
+
+        except Exception as e:
+            logger.error(f"Error handling interruption: {e}")
 
     async def close(self):
         """Close the Nova stream properly"""
@@ -492,30 +523,31 @@ class BedrockStreamManager:
             if not self.enable_frame_analysis:
                 logger.warning("Frame analysis tool called but frame analysis is disabled")
                 return {"error": "Frame analysis is disabled"}
-            
+
             # Use the captured frame or fall back to current frame
             frame_to_analyze = current_frame if current_frame is not None else self.frame
-            
+
             if frame_to_analyze is None:
                 logger.warning("No video frame available for analysis")
                 return {"error": "No video frame available for analysis"}
-            
+
             logger.info(f"🔍 Starting frame analysis with {'captured' if current_frame is not None else 'current'} frame")
-            
+
             try:
                 # Use the async version for non-blocking execution
                 analysis = await self.agent_tools.analyzeframe(frame_to_analyze, prompt)
-                
+
                 if analysis is None:
                     logger.warning("Frame analysis returned None")
                     return {"error": "Frame analysis failed - no result returned"}
-                
+
                 logger.info("🔍 Frame analysis completed successfully")
                 return analysis
-                
+
             except Exception as e:
                 logger.error(f"Frame analysis error: {e}")
                 import traceback
+
                 traceback.print_exc()
                 return {"error": f"Frame analysis failed: {str(e)}"}
         else:
@@ -531,7 +563,7 @@ class BedrockStreamManager:
         if tool_name.lower() == "analyzeframetool" and self.frame is not None:
             # Create a copy of the frame to avoid issues with frame updates during processing
             try:
-                current_frame = self.frame.copy() if hasattr(self.frame, 'copy') else self.frame
+                current_frame = self.frame.copy() if hasattr(self.frame, "copy") else self.frame
             except Exception as e:
                 logger.warning(f"Could not copy frame, using reference: {e}")
                 current_frame = self.frame

@@ -86,6 +86,16 @@ class AgentAudioTrack(AudioStreamTrack):
         except Exception as e:
             logger.error(f"Error adding audio data: {e}")
 
+    async def stop_current_audio(self):
+        """Stop current audio playback by clearing the buffer (for interruptions)"""
+        async with self.buffer_lock:
+            self.audio_buffer.clear()
+            logger.info("🛑 Audio buffer cleared due to interruption")
+
+        # Reset video throb to idle state
+        if self.agent_video_track:
+            self.agent_video_track.update_throb_level(0.0)
+
     async def stop(self):
         """Stop the audio track"""
         async with self.buffer_lock:
