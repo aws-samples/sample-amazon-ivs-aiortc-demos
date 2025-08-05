@@ -70,6 +70,10 @@ python ivs-stage-nova-s2s.py \
 -   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
 -   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
 
+#### Performance Configuration
+
+-   `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
+
 ### Example with All Options
 
 ```bash
@@ -79,7 +83,8 @@ python ivs-stage-nova-s2s.py \
   --nova-model-id "amazon.nova-sonic-v1:0" \
   --nova-region "us-east-1" \
   --bedrock-model-id "us.anthropic.claude-sonnet-4-20250514-v1:0" \
-  --bedrock-region "us-east-1"
+  --bedrock-region "us-east-1" \
+  --ice-timeout 1
 ```
 
 ### Disable Frame Analysis
@@ -89,6 +94,17 @@ python ivs-stage-nova-s2s.py \
   --token "your-jwt-token" \
   --subscribe-to "participant123" \
   --disable-frame-analysis
+```
+
+### Fast Connection Setup
+
+For faster connection establishment, use a shorter ICE timeout:
+
+```bash
+python ivs-stage-nova-s2s.py \
+  --token "your-jwt-token" \
+  --subscribe-to "participant123" \
+  --ice-timeout 1
 ```
 
 ## Tools Available
@@ -284,19 +300,25 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 
 ### Performance Optimization
 
-1. **Audio Processing**:
+1. **Connection Speed**:
+
+    - Use `--ice-timeout 1` for faster connection establishment (default)
+    - Original WebRTC ICE timeout is 5 seconds, reduced to 1 second for better UX
+    - Increase timeout if experiencing connection issues in poor network conditions
+
+2. **Audio Processing**:
 
     - Use consistent 1ms delays between audio chunks
     - Implement proper buffering strategies
     - Monitor memory usage during long sessions
 
-2. **Frame Analysis**:
+3. **Frame Analysis**:
 
     - Choose appropriate Claude model for your use case
     - Monitor Bedrock usage and costs
     - Consider disabling for performance-critical applications
 
-3. **Visualization**:
+4. **Visualization**:
     - Reduce frame rate if CPU usage is high
     - Disable visualization for headless operation
     - Use smaller video resolution if needed

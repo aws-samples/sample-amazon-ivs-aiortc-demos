@@ -18,9 +18,25 @@ from aiortc import (
 )
 import av
 
+# Monkey patch aioice to reduce ICE gathering timeout from default 5s
+import aioice.ice
 
-# Nova speech-to-speech imports
+# Global variable for ICE timeout (will be set from command line argument)
+ICE_TIMEOUT = 1  # Default 1 second
 
+# Store original function
+_original_get_component_candidates = aioice.ice.Connection.get_component_candidates
+
+
+async def patched_get_component_candidates(self, component, addresses, timeout=None):
+    """Patched version with configurable timeout instead of 5"""
+    if timeout is None:
+        timeout = ICE_TIMEOUT
+    return await _original_get_component_candidates(self, component, addresses, timeout)
+
+
+# Apply the patch
+aioice.ice.Connection.get_component_candidates = patched_get_component_candidates
 
 # Local imports
 from agent_video_track import AgentVideoTrack
@@ -43,11 +59,14 @@ aioice_logger.setLevel(logging.CRITICAL)
 stun_logger = logging.getLogger("aioice.stun")
 stun_logger.setLevel(logging.CRITICAL)
 
+# Log that the aioice timeout patch was applied
+logger.info(f"🧊 Applied aioice timeout patch: ICE gathering timeout reduced from 5s to {ICE_TIMEOUT}s")
+
 # Audio configuration for Nova
 INPUT_SAMPLE_RATE = 16000
 OUTPUT_SAMPLE_RATE = 24000
 CHANNELS = 1
-CHUNK_SIZE = 32
+CHUNK_SIZE = 48
 
 
 def parse_jwt(token: str) -> Dict[str, Any]:
@@ -172,11 +191,11 @@ async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: in
 
         try:
             response = requests.post(
-                current_url, 
-                data=sdp_offer, 
-                headers=headers, 
+                current_url,
+                data=sdp_offer,
+                headers=headers,
                 allow_redirects=False,
-                timeout=10  # Add explicit timeout of 10 seconds
+                timeout=10,  # Add explicit timeout of 10 seconds
             )
 
             if response.status_code in [301, 302, 303, 307, 308]:
@@ -393,18 +412,34 @@ def parse_args():
     parser = argparse.ArgumentParser(description="IVS Stage Publisher/Subscriber with Nova Speech-to-Speech")
     parser.add_argument("--token", required=True, help="IVS stage participant token")
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
-    
+
     # Nova options
     parser.add_argument("--nova-model-id", default="amazon.nova-sonic-v1:0", help="Nova model ID")
     parser.add_argument("--nova-region", default="us-east-1", help="AWS region for Nova")
-    
+
     # Frame analysis options
-    parser.add_argument("--disable-frame-analysis", action="store_true", help="Disable video frame analysis (default: enabled)")
-    parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
+    parser.add_argument(
+        "--disable-frame-analysis",
+        action="store_true",
+        help="Disable video frame analysis (default: enabled)",
+    )
+    parser.add_argument(
+        "--bedrock-region",
+        default="us-east-1",
+        help="AWS region for Bedrock service (default: us-east-1)",
+    )
     parser.add_argument(
         "--bedrock-model-id",
         default="us.anthropic.claude-sonnet-4-20250514-v1:0",
         help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
+    )
+
+    # Performance options
+    parser.add_argument(
+        "--ice-timeout",
+        type=int,
+        default=1,
+        help="ICE gathering timeout in seconds (default: 1, original: 5)",
     )
 
     return parser.parse_args()
@@ -414,10 +449,15 @@ async def main():
     """Main function that handles both publishing and subscribing with Nova speech-to-speech"""
     args = parse_args()
 
+    # Set global ICE timeout from command line argument
+    global ICE_TIMEOUT
+    ICE_TIMEOUT = args.ice_timeout
+
     # Handle frame analysis flag logic (enabled by default, disabled if --disable-frame-analysis is used)
     enable_frame_analysis = not args.disable_frame_analysis
 
     logger.info("🎬 Starting IVS Stage Publisher/Subscriber with Nova Speech-to-Speech")
+    logger.info(f"🧊 ICE gathering timeout set to {ICE_TIMEOUT}s (original: 5s)")
     logger.info(f"🔑 Using token: {args.token[:50]}... (truncated)")
     logger.info(f"🤖 Nova model: {args.nova_model_id}")
     logger.info(f"🌍 Nova region: {args.nova_region}")
