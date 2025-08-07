@@ -31,7 +31,8 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 -   **Event Handling**: Process real-time stage events via WebSocket connections
 -   **Audio Visualization**: Generate dynamic audio visualizations
 
-**IMPORTANT NOTE**: Deploying this demo application in your AWS account will create and consume AWS resources, which will cost money.
+> [!IMPORTANT]
+> Deploying this demo application in your AWS account will create and consume AWS resources, which will cost money.
 
 ## Project Structure
 
