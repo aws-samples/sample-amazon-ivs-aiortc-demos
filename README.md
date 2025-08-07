@@ -32,7 +32,7 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 -   **Audio Visualization**: Generate dynamic audio visualizations
 
 > [!IMPORTANT]
-> Deploying this demo application in your AWS account will create and consume AWS resources, which will cost money.
+> Using these demos with your AWS account will create and consume AWS resources, which will cost money.
 
 ## Project Structure
 
