@@ -40,7 +40,6 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 amazon-ivs-aiortc-demos/
 ├── README.md                                  # This file
 ├── requirements.txt                           # Python dependencies
-├── .gitignore                                 # Git ignore rules
 ├── stages-publish/                            # Publishing examples
 │   ├── ivs-stage-publish.py                   # Basic media publishing
 │   ├── ivs-stage-publish-events.py            # Publishing with event handling
