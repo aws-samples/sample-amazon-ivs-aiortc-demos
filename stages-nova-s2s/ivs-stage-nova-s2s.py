@@ -557,8 +557,13 @@ async def main():
 
         # Keep all connections alive
         try:
-            logger.info(f"🔄 {len(connections)} connection(s) active with Nova speech-to-speech. Press Ctrl+C to exit.")
+            logger.info(f"🔄 {len(connections)-1} connection(s) active with Nova speech-to-speech. Press Ctrl+C to exit.")
             logger.info("🎙️  Speak and Nova will respond through the IVS stage!")
+            logger.info(
+                "ℹ️  Amazon Nova Sonic may not always get it right. "
+                "Amazon Nova Sonic currently does not support session history "
+                "and conversations will end after 8 minutes."
+            )
             while True:
                 await asyncio.sleep(1)  # Keep the event loop running
 
