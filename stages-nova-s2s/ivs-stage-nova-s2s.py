@@ -66,7 +66,8 @@ logger.info(f"🧊 Applied aioice timeout patch: ICE gathering timeout reduced f
 INPUT_SAMPLE_RATE = 16000
 OUTPUT_SAMPLE_RATE = 24000
 CHANNELS = 1
-CHUNK_SIZE = 48
+# CHUNK_SIZE is now calculated automatically based on timing (40ms chunks)
+# This provides better audio quality and reduces choppiness
 
 
 def parse_jwt(token: str) -> Dict[str, Any]:
@@ -506,8 +507,7 @@ async def main():
         agent_audio_track = AgentAudioTrack(
             agent_video_track=agent_video_track, 
             sample_rate=OUTPUT_SAMPLE_RATE, 
-            channels=CHANNELS, 
-            chunk_size=CHUNK_SIZE
+            channels=CHANNELS
         )
         # fmt:on
 
