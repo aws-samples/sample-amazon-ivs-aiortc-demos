@@ -79,6 +79,7 @@ class BedrockStreamManager:
 
         # Single audio content session
         self.audio_session_started = False
+        self.current_response_id = None  # Track current response to avoid duplicates
 
         # Tool processing
         self.tool_use_content = ""
@@ -407,19 +408,42 @@ class BedrockStreamManager:
                                     elif role == "ASSISTANT":
                                         self.agent_video_track.set_thinking_state(False)
 
-                                    # Only log if it's not a duplicate (simple dedup)
-                                    if not hasattr(self, "_last_text") or self._last_text != text_content:
+                                    # Improved deduplication - track by role and content
+                                    dedup_key = f"{role}:{text_content}"
+                                    if not hasattr(self, "_seen_texts"):
+                                        self._seen_texts = set()
+
+                                    if dedup_key not in self._seen_texts:
                                         logger.info(f"🤖 Nova ({role}): {text_content}")
-                                        self._last_text = text_content
+                                        self._seen_texts.add(dedup_key)
+
+                                        # Clear old entries to prevent memory growth (keep last 10)
+                                        if len(self._seen_texts) > 10:
+                                            self._seen_texts = set(list(self._seen_texts)[-5:])
 
                                 elif "audioOutput" in json_data["event"]:
                                     # Turn off thinking state when we get audio output (always from assistant)
                                     self.agent_video_track.set_thinking_state(False)
 
-                                    audio_content = json_data["event"]["audioOutput"]["content"]
+                                    # Detailed logging to understand the audio stream structure
+                                    audio_event = json_data["event"]["audioOutput"]
+                                    response_id = audio_event.get("promptName", "")
+                                    content_name = audio_event.get("contentName", "")
+
+                                    # Log detailed audio event info
+                                    # logger.info(f"🎵 Audio event - Response: {response_id}, Content: {content_name}")
+
+                                    if self.current_response_id != response_id:
+                                        if self.current_response_id is not None:
+                                            logger.info(f"🔄 Response ID changed: {self.current_response_id} -> {response_id}")
+                                        self.current_response_id = response_id
+
+                                    audio_content = audio_event["content"]
                                     audio_bytes = base64.b64decode(audio_content)
 
-                                    # Send audio to Nova audio track for publishing (it will update video track throb)
+                                    # logger.info(f"🎵 Audio chunk: {len(audio_bytes)} bytes")
+
+                                    # Always send audio - let the audio track handle any issues
                                     await self.agent_audio_track.add_audio_data(audio_bytes)
 
                                 elif "toolUse" in json_data["event"]:
@@ -467,6 +491,11 @@ class BedrockStreamManager:
 
             # Set video track to idle state (not thinking, not speaking)
             self.agent_video_track.set_thinking_state(False)
+
+            # Reset deduplication state for new conversation
+            self.current_response_id = None
+            if hasattr(self, "_seen_texts"):
+                self._seen_texts.clear()
 
             logger.info("🛑 Agent speech stopped due to user interruption")
 
