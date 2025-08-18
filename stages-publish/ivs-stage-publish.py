@@ -160,11 +160,7 @@ async def join_stage_as_publisher(token: str, path_to_mp4: str, video_only: bool
 
         try:
             response = requests.post(
-                current_url, 
-                data=pc.localDescription.sdp, 
-                headers=headers, 
-                allow_redirects=False,
-                timeout=10  # Add explicit timeout of 10 seconds
+                current_url, data=pc.localDescription.sdp, headers=headers, allow_redirects=False, timeout=10  # Add explicit timeout of 10 seconds
             )
         except requests.exceptions.Timeout:
             logger.error(f"Request to {current_url} timed out after 10 seconds")

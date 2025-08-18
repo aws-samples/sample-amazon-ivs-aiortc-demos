@@ -449,6 +449,12 @@ def parse_args():
         help="ICE gathering timeout in seconds (default: 1, original: 5)",
     )
 
+    # Weather API options
+    parser.add_argument(
+        "--weather-api-key",
+        help="Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)",
+    )
+
     return parser.parse_args()
 
 
@@ -511,6 +517,9 @@ async def main():
         )
         # fmt:on
 
+        # Get weather API key from argument or environment variable
+        weather_api_key = args.weather_api_key or os.getenv("WEATHER_API_KEY")
+
         # Initialize Nova stream manager
         logger.info("🤖 Initializing Nova speech-to-speech...")
         # fmt:off
@@ -519,7 +528,7 @@ async def main():
             agent_video_track=agent_video_track, 
             model_id=args.nova_model_id, 
             region=args.nova_region,
-            weather_api_key=os.getenv("WEATHER_API_KEY"),
+            weather_api_key=weather_api_key,
             enable_frame_analysis=enable_frame_analysis,
             analysis_model_id=args.bedrock_model_id,
             analysis_region=args.bedrock_region

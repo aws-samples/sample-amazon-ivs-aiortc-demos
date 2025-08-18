@@ -14,7 +14,7 @@ import tempfile
 import uuid
 from typing import Dict, Any, List, Optional
 from fractions import Fraction
-import numpy as np 
+import numpy as np
 from aiortc import (
     RTCBundlePolicy,
     RTCConfiguration,
@@ -42,11 +42,11 @@ stun_logger.setLevel(logging.CRITICAL)
 
 class AudioVideoChunkRecorder:
     """Records audio and video chunks in memory for analysis"""
-    
+
     def __init__(self, chunk_duration: float = 10.0):
         """
         Initialize the audio and video chunk recorder
-        
+
         Args:
             chunk_duration: Duration in seconds for each chunk
         """
@@ -56,92 +56,89 @@ class AudioVideoChunkRecorder:
         self.should_stop = False
         self.recording = False
         self.start_time = 0
-        
+
     async def start_recording(self):
         """Start recording a new chunk"""
         if self.recording:
             logger.warning("Already recording a chunk")
             return False
-            
+
         logger.info("🎥 Starting audio and video chunk recording")
         self.recorded_video_frames = []
         self.recorded_audio_frames = []
         self.recording = True
         self.start_time = time.time()
         return True
-        
+
     async def stop_recording(self):
         """Stop recording and return the recorded frames"""
         if not self.recording:
             logger.warning("Not currently recording")
             return None
-            
+
         logger.info(f"⏹️  Stopping recording after {time.time() - self.start_time:.2f}s")
         self.recording = False
-        
+
         if not self.recorded_video_frames:
             logger.error("No video frames were recorded")
             return None
-          
+
         if not self.recorded_audio_frames:
             logger.error("No audio frames were recorded")
             return None
-            
+
         logger.info(f"✅ Recorded {len(self.recorded_video_frames)} video frames")
         logger.info(f"✅ Recorded {len(self.recorded_audio_frames)} audio frames")
         return self.recorded_video_frames.copy(), self.recorded_audio_frames.copy()
-        
+
     async def process_video_frame(self, frame):
         """Process a video frame"""
         if self.recording:
             self.recorded_video_frames.append(frame)
-            
+
     async def process_audio_frame(self, frame):
         """Process an audio frame"""
         if self.recording:
             self.recorded_audio_frames.append(frame)
-            
+
     def encode_video_to_mp4(self, video_frames, audio_frames):
         """
         Encode audio and video frames to MP4 format in memory using pure Python (no ffmpeg)
-        
+
         Args:
             video_frames: List of video frames
             audio_frames: List of audio frames
-            
+
         Returns:
             Base64 encoded MP4 video or None if failed
         """
         if not video_frames:
             logger.error("No video frames to encode")
             return None
-            
+
         try:
             # Create in-memory buffer
             output_buffer = io.BytesIO()
-            
+
             target_width = 640
             target_height = 360
-            
+
             # output container
-            output = av.open(output_buffer, mode='w', format='mp4')
-            
+            output = av.open(output_buffer, mode="w", format="mp4")
+
             # Add video stream with explicit framerate
             video_stream = output.add_stream("h264", rate=30)
             video_stream.width = target_width
             video_stream.height = target_height
             video_stream.pix_fmt = "yuv420p"
-            video_stream.options = {
-                "preset": "ultrafast",
-                "profile": "baseline"
-            }
-            
+            video_stream.options = {"preset": "ultrafast", "profile": "baseline"}
+
             audio_stream = output.add_stream("opus")
             audio_stream.format = "s16"
-            
+
             new_video_pts = 0
             new_audio_pts = 0
-            
+
             for i, video_frame in enumerate(video_frames):
                 try:
                     # Convert frame to PIL Image for resizing
@@ -150,7 +147,7 @@ class AudioVideoChunkRecorder:
                     img = img.resize((target_width, target_height), Image.LANCZOS)
                     resized_array = np.array(img)
                     # Create new frame from numpy array
-                    resized_video_frame = av.VideoFrame.from_ndarray(resized_array, format='rgb24')
+                    resized_video_frame = av.VideoFrame.from_ndarray(resized_array, format="rgb24")
                     video_frame.pts = new_video_pts
                     video_frame.time_base = Fraction(1, 30)  # Match the stream's rate
                     video_packets = video_stream.encode(resized_video_frame)
@@ -160,47 +157,48 @@ class AudioVideoChunkRecorder:
                 except Exception as frame_error:
                     logger.warning(f"Skipping video frame {i} due to error: {frame_error}")
                     continue
-                  
+
             for i, audio_frame in enumerate(audio_frames):
-              try:
-                  audio_frame.pts = new_audio_pts
-                  audio_frame.time_base = Fraction(1, 48000)
-                  audio_packets = audio_stream.encode(audio_frame)
-                  new_audio_pts += 960
-                  for packet in audio_packets:
-                      output.mux(packet)
-              except Exception as frame_error:
-                  logger.warning(f"Skipping audio frame {i} due to error: {frame_error}")
-                  continue
-            
+                try:
+                    audio_frame.pts = new_audio_pts
+                    audio_frame.time_base = Fraction(1, 48000)
+                    audio_packets = audio_stream.encode(audio_frame)
+                    new_audio_pts += 960
+                    for packet in audio_packets:
+                        output.mux(packet)
+                except Exception as frame_error:
+                    logger.warning(f"Skipping audio frame {i} due to error: {frame_error}")
+                    continue
+
             # Flush the encoder
             for packet in video_stream.encode(None):
                 output.mux(packet)
-                
+
             for packet in audio_stream.encode(None):
                 output.mux(packet)
-                
+
             # Close the container
             output.close()
-            
+
             # Get the encoded data
             encoded_data = output_buffer.getvalue()
-            
+
             # tmp_file = f"/tmp/{time.time()}.mp4"
             # with open(tmp_file, "wb") as file:
             #   file.write(encoded_data)
             #   logger.info(f"Write tmp file: {tmp_file}")
-                
+
             # Convert to base64
-            base64_data = base64.b64encode(encoded_data).decode('utf-8')
-            
+            base64_data = base64.b64encode(encoded_data).decode("utf-8")
+
             logger.info(f"✅ Successfully encoded video: {len(encoded_data)} bytes, {len(base64_data)} base64 chars")
-            
+
             return base64_data
-            
+
         except Exception as e:
             logger.error(f"Error encoding video: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
@@ -222,7 +220,7 @@ class VideoAnalyzer:
         self.bedrock_client = boto3.client("bedrock-runtime", region_name=region)
         self.model_id = model_id
         self.analysis_in_progress = False
-        
+
         logger.info(f"🤖 VideoAnalyzer initialized with {analysis_duration}s recording duration")
         logger.info(f"🌍 Using Bedrock region: {region}")
         logger.info(f"🧠 Using model: {self.model_id}")
@@ -248,29 +246,24 @@ class VideoAnalyzer:
         """
         # Mark analysis as in progress to prevent overlapping recordings
         self.analysis_in_progress = True
-        
+
         try:
             if not video_base64:
                 logger.error("No video data provided for analysis")
                 return None
-                
+
             # Prepare the request for Pegasus
             request_body = {
                 "inputPrompt": "Analyze this video from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. This could be used for content discovery, moderation, or accessibility purposes. Be specific and comprehensive.",
-                "mediaSource": {
-                    "base64String": video_base64
-                },
-                "temperature": 0.2
+                "mediaSource": {"base64String": video_base64},
+                "temperature": 0.2,
             }
 
             # Call Bedrock
             logger.info(f"🔍 Analyzing video for participant {participant_id}...")
 
             response = self.bedrock_client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(request_body),
-                contentType="application/json",
-                accept="application/json"
+                modelId=self.model_id, body=json.dumps(request_body), contentType="application/json", accept="application/json"
             )
 
             # Parse response
@@ -286,6 +279,7 @@ class VideoAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing video: {e}")
             import traceback
+
             traceback.print_exc()
             return None
         finally:
@@ -415,11 +409,7 @@ async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: in
 
         try:
             response = requests.post(
-                current_url, 
-                data=sdp_offer, 
-                headers=headers, 
-                allow_redirects=False,
-                timeout=10  # Add explicit timeout of 10 seconds
+                current_url, data=sdp_offer, headers=headers, allow_redirects=False, timeout=10  # Add explicit timeout of 10 seconds
             )
 
             if response.status_code in [301, 302, 303, 307, 308]:
@@ -460,13 +450,13 @@ async def subscribe_to_participant(token: str, participant_id: str, analyzer: Vi
     # Add transceivers for receiving audio and video
     pc.addTransceiver("audio", direction="recvonly")
     pc.addTransceiver("video", direction="recvonly")
-    
+
     video_track = None
     audio_track = None
-    
+
     # Create video chunk recorder
     recorder = AudioVideoChunkRecorder(analyzer.analysis_duration)
-    
+
     @pc.on("connectionstatechange")
     def on_connectionstatechange():
         logger.info(f"🔗 Connection state changed to: {pc.connectionState}")
@@ -499,10 +489,10 @@ async def subscribe_to_participant(token: str, participant_id: str, analyzer: Vi
         elif track.kind == "video":
             logger.info("🎥 Video track received")
             video_track = track
-            
-        if(video_track is not None and audio_track is not None):
+
+        if video_track is not None and audio_track is not None:
             asyncio.create_task(process_video_track(video_track, recorder, analyzer, participant_id))
-        
+
     async def process_audio_track(track: MediaStreamTrack, recorder: AudioVideoChunkRecorder):
         """Process audio track in a separate async task"""
         logger.info("🎵 Starting audio processing task")
@@ -516,10 +506,12 @@ async def subscribe_to_participant(token: str, participant_id: str, analyzer: Vi
         except Exception as e:
             logger.error(f"Audio track processing error for participant {participant_id}: {e}")
             import traceback
-            traceback.print_exc()
-            
 
-    async def process_video_track(video_track: MediaStreamTrack, recorder: AudioVideoChunkRecorder, analyzer: VideoAnalyzer = None, participant_id: str = "unknown"):
+            traceback.print_exc()
+
+    async def process_video_track(
+        video_track: MediaStreamTrack, recorder: AudioVideoChunkRecorder, analyzer: VideoAnalyzer = None, participant_id: str = "unknown"
+    ):
         """Process video track in a separate async task with in-memory video recording and analysis"""
         logger.info("🧐 Starting audio and video processing task")
         if analyzer:
@@ -531,23 +523,23 @@ async def subscribe_to_participant(token: str, participant_id: str, analyzer: Vi
             while True:
                 video_frame = await video_track.recv()
                 frame_count += 1
-                
+
                 # Process the frame
                 await recorder.process_video_frame(video_frame)
-                
+
                 # Start recording if analyzer is provided and enough time has passed since last analysis
                 if analyzer and analyzer.should_analyze_video() and not recorder.recording:
                     await recorder.start_recording()
-                
+
                 # Check if recording duration has been reached
                 if recorder.recording and (time.time() - recorder.start_time) >= analyzer.analysis_duration:
                     # Stop recording and get frames
                     video_frames, audio_frames = await recorder.stop_recording()
-                    
+
                     if video_frames:
                         # Encode video to MP4 in memory
                         video_base64 = recorder.encode_video_to_mp4(video_frames, audio_frames)
-                        
+
                         if video_base64:
                             # Analyze the video
                             asyncio.create_task(analyzer.analyze_video(video_base64, participant_id))
@@ -559,6 +551,7 @@ async def subscribe_to_participant(token: str, participant_id: str, analyzer: Vi
         except Exception as e:
             logger.error(f"Video track processing error: {e}")
             import traceback
+
             traceback.print_exc()
 
     # Create offer
@@ -596,7 +589,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="IVS Stage Subscriber with Video Analyzer")
     parser.add_argument("--token", required=True, help="IVS stage participant token")
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
-    parser.add_argument("--analysis-duration", type=float, default=10.0, help="Duration in seconds for video recording before analysis (default: 10.0)")
+    parser.add_argument(
+        "--analysis-duration", type=float, default=10.0, help="Duration in seconds for video recording before analysis (default: 10.0)"
+    )
     parser.add_argument("--bedrock-region", default="us-west-2", help="AWS region for Bedrock service (default: us-west-2)")
     parser.add_argument(
         "--bedrock-model-id",
@@ -694,6 +689,7 @@ async def main():
     except Exception as e:
         logger.error(f"❌ Error in main: {e}")
         import traceback
+
         traceback.print_exc()
 
 
