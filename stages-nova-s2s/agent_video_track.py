@@ -66,13 +66,13 @@ class AgentVideoTrack(VideoStreamTrack):
 
     def _apply_smooth_circle(self, frame_array, center_x, center_y, radius, color, alpha=1.0, smoothness=2.0):
         """Apply a very smooth antialiased circle with enhanced edge smoothing"""
-        y, x = np.ogrid[:self.height, :self.width]
+        y, x = np.ogrid[: self.height, : self.width]
         distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-        
+
         # Create ultra-smooth antialiased edges with wider transition zone
         transition_width = smoothness
         edge_alpha = np.clip((radius + transition_width - distance) / transition_width, 0, 1) * alpha
-        
+
         # Apply smooth blending
         for i in range(3):
             current_values = frame_array[:, :, i].astype(np.float32)
@@ -84,35 +84,35 @@ class AgentVideoTrack(VideoStreamTrack):
         self.spin_phase += (self.spin_speed * 2 * np.pi) / self.fps
         if self.spin_phase > 2 * np.pi:
             self.spin_phase -= 2 * np.pi
-            
-        y, x = np.ogrid[:self.height, :self.width]
+
+        y, x = np.ogrid[: self.height, : self.width]
         distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-        
+
         # Create donut mask
         donut_mask = (distance >= inner_radius) & (distance <= outer_radius)
-        
+
         # Calculate angle for each pixel
         angle = np.arctan2(y - center_y, x - center_x) + np.pi  # 0 to 2π
-        
+
         # Create spinning gradient effect
         gradient_phase = (angle + self.spin_phase) % (2 * np.pi)
         gradient_intensity = (np.sin(gradient_phase * 2) + 1) / 2  # 0-1 range with 2 cycles
-        
+
         # Add radial gradient for donut thickness
         donut_thickness = outer_radius - inner_radius
         radial_pos = (distance - inner_radius) / donut_thickness
         radial_gradient = 1.0 - np.abs(radial_pos - 0.5) * 2  # Peak at center of donut
-        
+
         # Combine gradients
         final_intensity = gradient_intensity * radial_gradient * 0.6
-        
+
         # Apply smooth edges to donut
         inner_edge = np.clip((distance - inner_radius + 1) / 2, 0, 1)
         outer_edge = np.clip((outer_radius + 1 - distance) / 2, 0, 1)
         edge_mask = inner_edge * outer_edge
-        
+
         final_alpha = final_intensity * edge_mask
-        
+
         # Apply the spinning donut
         for i in range(3):
             current_values = frame_array[:, :, i][donut_mask].astype(np.float32)
@@ -141,14 +141,14 @@ class AgentVideoTrack(VideoStreamTrack):
 
                 # Create outer glow with smooth falloff
                 glow_radius = current_radius + 30
-                y, x = np.ogrid[:self.height, :self.width]
+                y, x = np.ogrid[: self.height, : self.width]
                 distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-                
+
                 # Smooth glow falloff
                 glow_mask = distance <= glow_radius
                 glow_intensity = np.exp(-(distance - current_radius) / 15) * 0.4 * pulse_intensity
                 glow_intensity = np.clip(glow_intensity, 0, 1)
-                
+
                 for i in range(3):
                     current_values = frame_array[:, :, i][glow_mask].astype(np.float32)
                     new_values = current_values + self.thinking_glow_color[i] * glow_intensity[glow_mask]
@@ -169,7 +169,7 @@ class AgentVideoTrack(VideoStreamTrack):
                 current_radius = self.base_radius + throb_amount
 
                 # Create coordinate grids
-                y, x = np.ogrid[:self.height, :self.width]
+                y, x = np.ogrid[: self.height, : self.width]
                 distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
 
                 # Create smooth glow effect

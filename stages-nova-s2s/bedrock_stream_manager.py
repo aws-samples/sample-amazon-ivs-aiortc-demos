@@ -8,6 +8,8 @@ import json
 from agent_video_track import AgentVideoTrack
 from agent_audio_track import AgentAudioTrack
 from agent_tools import AgentTools
+from sei_publisher import SeiPublisher
+from h264_sei_patch import set_global_sei_publisher
 
 from rx.subject import Subject
 from rx import operators as ops
@@ -77,6 +79,11 @@ class BedrockStreamManager:
         self.content_name = str(uuid.uuid4())
         self.audio_content_name = str(uuid.uuid4())
 
+        # SEI Publisher for metadata transmission
+        self.sei_publisher = SeiPublisher(max_retry_attempts=3)
+        set_global_sei_publisher(self.sei_publisher)
+        logger.info("📡 SEI Publisher initialized for H.264 metadata transmission")
+
         # Single audio content session
         self.audio_session_started = False
         self.current_response_id = None  # Track current response to avoid duplicates
@@ -86,6 +93,9 @@ class BedrockStreamManager:
         self.tool_use_id = ""
         self.tool_name = ""
         self.pending_tool_tasks = {}
+
+        # SEI message tracking
+        self._publish_sequence = 0
 
         # Initialize schemas and templates
         self._initialize_schemas_and_templates()
@@ -322,6 +332,7 @@ class BedrockStreamManager:
                 on_error=lambda e: logger.error(f"Audio stream error: {e}"),
             )
 
+            # Start SEI cleanup task
             logger.info("✅ Nova stream initialized successfully")
             return self
 
@@ -416,6 +427,37 @@ class BedrockStreamManager:
                                     if dedup_key not in self._seen_texts:
                                         logger.info(f"🤖 Nova ({role}): {text_content}")
                                         self._seen_texts.add(dedup_key)
+
+                                        # Publish text content as SEI metadata
+                                        try:
+                                            import time
+
+                                            publish_timestamp = time.time()
+                                            sei_data = {
+                                                "type": "nova_text_output",
+                                                "role": role,
+                                                "content": text_content,
+                                                "timestamp": publish_timestamp,
+                                                "session_id": self.prompt_name,
+                                                "content_id": self.content_name,
+                                                "publish_sequence": getattr(self, "_publish_sequence", 0) + 1,
+                                                "content_length": len(text_content),
+                                                "dedup_key": dedup_key,
+                                            }
+
+                                            # Track publish sequence
+                                            self._publish_sequence = sei_data["publish_sequence"]
+
+                                            await self.sei_publisher.publish_json(sei_data, repeat_count=1)
+
+                                            logger.info(
+                                                f"📡 Published SEI message #{sei_data['publish_sequence']}: {role} - '{text_content[:30]}{'...' if len(text_content) > 30 else ''}' ({len(text_content)} chars)"
+                                            )
+                                            logger.debug(
+                                                f"📡 Published {role} text to SEI: {text_content[:50]}{'...' if len(text_content) > 50 else ''}"
+                                            )
+                                        except Exception as sei_error:
+                                            logger.error(f"❌ Failed to publish SEI text: {sei_error}")
 
                                         # Clear old entries to prevent memory growth (keep last 10)
                                         if len(self._seen_texts) > 10:
@@ -525,6 +567,8 @@ class BedrockStreamManager:
 
         # Stop the audio track
         await self.agent_audio_track.stop()
+
+        logger.info("✅ Nova stream closed")
 
     async def process_tool_async(self, tool_name, tool_content, current_frame=None, prompt=None):
         """Process a tool call asynchronously and return the result"""

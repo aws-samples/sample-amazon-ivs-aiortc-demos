@@ -96,12 +96,38 @@ class SeiPublisher:
 
             payload_bytes = json.dumps(data).encode("utf-8")
 
+            # Check payload size - IVS has 1KB SEI limit, so keep individual messages small
+            MAX_PAYLOAD_SIZE = 400  # Conservative limit for individual message
+            if len(payload_bytes) > MAX_PAYLOAD_SIZE:
+                # Truncate content if too large
+                if "content" in data and len(data["content"]) > 100:
+                    original_content = data["content"]
+                    data["content"] = original_content[:100] + "..."
+                    data["truncated"] = True
+                    data["original_length"] = len(original_content)
+                    payload_bytes = json.dumps(data).encode("utf-8")
+                    logger.warning(
+                        f"📡 Truncated SEI message from {len(json.dumps({**data, 'content': original_content}).encode('utf-8'))} to {len(payload_bytes)} bytes"
+                    )
+
+            queue_timestamp = time.time()
             message = SeiMessage(payload=payload_bytes, repeat_count=repeat_count, timestamp=data["timestamp"])
 
             async with self._lock:
+                queue_size_before = len(self.message_queue)
                 self.message_queue.append(message)
+                queue_size_after = len(self.message_queue)
 
-            logger.info(f"📡 Queued SEI JSON message: {len(payload_bytes)} bytes")
+            # Calculate time since original message timestamp
+            time_since_creation = queue_timestamp - data["timestamp"]
+
+            logger.info(
+                f"📡 Queued SEI message: {len(payload_bytes)} bytes, queue: {queue_size_before}→{queue_size_after}, delay: {time_since_creation*1000:.1f}ms"
+            )
+
+            # Log additional details for tracking
+            if "publish_sequence" in data:
+                logger.info(f"📡 Message #{data['publish_sequence']} queued: {data.get('role', 'unknown')} - repeat_count: {repeat_count}")
             return True
 
         except Exception as e:
@@ -124,9 +150,8 @@ class SeiPublisher:
 
     def _do_emulation_prevention(self, payload: bytes) -> bytes:
         """
-        Apply emulation prevention to avoid start code sequences in payload.
-
-        Replaces sequences like 0x00 0x00 0x00, 0x00 0x00 0x01, etc.
+        Apply emulation prevention exactly like reference implementation.
+        Replaces 0x00 0x00 0x00, 0x00 0x00 0x01, 0x00 0x00 0x02, 0x00 0x00 0x03
         with 0x00 0x00 0x03 0x00, 0x00 0x00 0x03 0x01, etc.
         """
         new_payload = bytearray(payload)
@@ -150,26 +175,45 @@ class SeiPublisher:
     def _find_insert_position(self, frame_data: bytes) -> int:
         """Find position to insert SEI NAL unit (before first video slice)"""
         data_len = len(frame_data)
+        i = 0
 
-        for i in range(data_len - 4):
-            # Look for start code pattern
+        while i < data_len - 4:
+            # Check for 3-byte start code
             if frame_data[i] == 0x00 and frame_data[i + 1] == 0x00 and frame_data[i + 2] == 0x01:
 
                 nal_unit_type = frame_data[i + 3] & 0x1F
                 # Insert before video slice NAL units (types 1-5)
                 if 1 <= nal_unit_type <= 5:
                     return i
+                i += 3
+
+            # Check for 4-byte start code
+            elif i < data_len - 5 and frame_data[i] == 0x00 and frame_data[i + 1] == 0x00 and frame_data[i + 2] == 0x00 and frame_data[i + 3] == 0x01:
+
+                nal_unit_type = frame_data[i + 4] & 0x1F
+                # Insert before video slice NAL units (types 1-5)
+                if 1 <= nal_unit_type <= 5:
+                    return i
+                i += 4
+            else:
+                i += 1
 
         return -1
 
     def _insert_sei_unit(self, frame_data: bytes, sei_unit: bytes) -> bytes:
-        """Insert SEI unit into frame data"""
+        """Insert SEI unit into frame data at optimal position"""
         insert_position = self._find_insert_position(frame_data)
 
         if insert_position >= 0:
-            return frame_data[:insert_position] + sei_unit + frame_data[insert_position:]
-
-        return frame_data
+            # Insert SEI unit before the found NAL unit
+            new_data = bytearray(len(frame_data) + len(sei_unit))
+            new_data[:insert_position] = frame_data[:insert_position]
+            new_data[insert_position : insert_position + len(sei_unit)] = sei_unit
+            new_data[insert_position + len(sei_unit) :] = frame_data[insert_position:]
+            return bytes(new_data)
+        else:
+            # Fallback: prepend to beginning of frame
+            return sei_unit + frame_data
 
     async def process_frame(self, frame_data: bytes) -> bytes:
         """

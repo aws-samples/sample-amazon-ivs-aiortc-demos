@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Apply H.264 SEI patch BEFORE importing aiortc
+import h264_sei_patch
+
 import asyncio
 import json
 import logging
