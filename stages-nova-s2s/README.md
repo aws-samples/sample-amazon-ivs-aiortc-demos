@@ -11,6 +11,7 @@ This script integrates Amazon IVS Real-Time Stages with Amazon Nova Sonic for AI
     -   Orange pulsing animation when Nova is thinking/processing
     -   Audio-reactive visualization during responses
 -   **Tool Support**: Built-in tools for date/time, weather information, and video frame analysis
+-   **SEI Publishing**: Embeds AI assistant responses directly into H.264 video streams using SEI NAL units
 -   **Audio Processing**: Handles resampling between IVS (48kHz) and Nova (16kHz) formats
 -   **WebRTC Management**: Proper SDP handling for both publishing and subscribing
 -   **Configurable Frame Analysis**: Optional AI-powered video frame analysis using Amazon Bedrock Claude models
@@ -229,6 +230,14 @@ Analyze video frames from the live stream using AI
 -   **Nova Output**: 24kHz mono for speech synthesis
 -   **Output Format**: 48kHz stereo for IVS publishing
 
+### SEI Publishing
+
+-   **Metadata Embedding**: AI assistant responses are embedded directly into H.264 video streams
+-   **Perfect Synchronization**: Metadata travels with video frames ensuring synchronized delivery
+-   **Standards Compliant**: Uses H.264 SEI (Supplemental Enhancement Information) NAL units
+-   **Automatic Integration**: Seamlessly integrates with aiortc and PyAV H.264 encoders
+-   **Reliable Delivery**: 3x repetition with client-side deduplication based on timestamps
+
 ### Frame Analysis
 
 -   **Processing**: Asynchronous, non-blocking frame analysis
@@ -397,6 +406,19 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 -   "Should I bring an umbrella tomorrow in London?"
 -   "What do you see and what's the weather like outside?"
 
+## SEI Publishing System
+
+This script uses the SEI (Supplemental Enhancement Information) publishing system located in `../stages_sei/` to embed AI assistant responses directly into the H.264 video stream. This ensures perfect synchronization between video content and AI-generated metadata.
+
+**Key Benefits:**
+
+-   AI responses are embedded in video frames for synchronized delivery
+-   No separate data channels needed for metadata transmission
+-   Standards-compliant H.264 implementation
+-   Automatic integration with existing video pipelines
+
+**For detailed SEI documentation, see [`../stages_sei/SEI.md`](../stages_sei/SEI.md).**
+
 ---
 
-_This script demonstrates advanced integration between Amazon IVS Real-Time Stages, Amazon Nova Sonic, and Amazon Bedrock Claude, showcasing real-time conversational AI capabilities with comprehensive tool support in live video environments._
+_This script demonstrates advanced integration between Amazon IVS Real-Time Stages, Amazon Nova Sonic, Amazon Bedrock Claude, and SEI publishing, showcasing real-time conversational AI capabilities with synchronized metadata delivery in live video environments._

@@ -1,5 +1,11 @@
 .venv
-__pycache__
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.kiro/
+.vscode/
 ivs-stage-blank-video.py
 weather-api-key.md
 bandit*

@@ -8,8 +8,11 @@ import json
 from agent_video_track import AgentVideoTrack
 from agent_audio_track import AgentAudioTrack
 from agent_tools import AgentTools
-from sei_publisher import SeiPublisher
-from h264_sei_patch import set_global_sei_publisher
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from stages_sei import SeiPublisher, set_global_sei_publisher
 
 from rx.subject import Subject
 from rx import operators as ops
@@ -94,8 +97,7 @@ class BedrockStreamManager:
         self.tool_name = ""
         self.pending_tool_tasks = {}
 
-        # SEI message tracking
-        self._publish_sequence = 0
+        # SEI message tracking (removed publish_sequence for cleaner payload)
 
         # Initialize schemas and templates
         self._initialize_schemas_and_templates()
@@ -438,20 +440,12 @@ class BedrockStreamManager:
                                                 "role": role,
                                                 "content": text_content,
                                                 "timestamp": publish_timestamp,
-                                                "session_id": self.prompt_name,
-                                                "content_id": self.content_name,
-                                                "publish_sequence": getattr(self, "_publish_sequence", 0) + 1,
-                                                "content_length": len(text_content),
-                                                "dedup_key": dedup_key,
                                             }
 
-                                            # Track publish sequence
-                                            self._publish_sequence = sei_data["publish_sequence"]
-
-                                            await self.sei_publisher.publish_json(sei_data, repeat_count=1)
+                                            await self.sei_publisher.publish_json(sei_data, repeat_count=3)
 
                                             logger.info(
-                                                f"📡 Published SEI message #{sei_data['publish_sequence']}: {role} - '{text_content[:30]}{'...' if len(text_content) > 30 else ''}' ({len(text_content)} chars)"
+                                                f"📡 Published SEI message: {role} - '{text_content[:30]}{'...' if len(text_content) > 30 else ''}' ({len(text_content)} chars)"
                                             )
                                             logger.debug(
                                                 f"📡 Published {role} text to SEI: {text_content[:50]}{'...' if len(text_content) > 50 else ''}"

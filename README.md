@@ -15,6 +15,7 @@ A comprehensive collection of Python demo scripts demonstrating various Amazon I
     -   [Stages Publish](#stages-publish)
     -   [Stages Subscribe](#stages-subscribe)
     -   [Stages Nova Speech-to-Speech](#stages-nova-speech-to-speech)
+    -   [Stages SEI Publishing](#stages-sei-publishing)
 -   [Usage Examples](#usage-examples)
 -   [Troubleshooting](#troubleshooting)
 -   [Contributing](#contributing)
@@ -28,6 +29,7 @@ This project demonstrates how to integrate Amazon IVS Real-Time Stages with vari
 -   **Real-time Transcription**: Convert speech to text using OpenAI Whisper
 -   **AI Video Analysis**: Analyze video frames using Amazon Bedrock Claude models
 -   **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
+-   **SEI Publishing**: Embed metadata directly into H.264 video streams using SEI NAL units
 -   **Event Handling**: Process real-time stage events via WebSocket connections
 -   **Audio Visualization**: Generate dynamic audio visualizations
 
@@ -48,8 +50,12 @@ amazon-ivs-aiortc-demos/
 │   ├── ivs-stage-subscribe-transcribe.py      # Subscribe with transcription
 │   ├── ivs-stage-subscribe-analyze-frames.py  # Subscribe with AI frame analysis
 │   └── ivs-stage-subscribe-analyze-video.py   # Subscribe with AI video analysis
-└── stages-nova-s2s/                           # AI Speech-to-Speech
-    └── ivs-stage-nova-s2s.py                  # Nova Sonic integration
+├── stages-nova-s2s/                           # AI Speech-to-Speech
+│   └── ivs-stage-nova-s2s.py                  # Nova Sonic integration
+└── stages_sei/                                # SEI Publishing System
+    ├── SEI.md                                 # SEI documentation and usage guide
+    ├── sei_publisher.py                       # High-level SEI message publishing
+    └── h264_sei_patch.py                      # Low-level H.264 encoder patching
 ```
 
 ## Prerequisites
@@ -411,6 +417,56 @@ python ivs-stage-nova-s2s.py \
 -   **Date/Time Tool**: Get current date and time information with timezone support
 -   **Weather Tool**: Get current weather and 5-day forecast (requires `WEATHER_API_KEY`)
 -   **Frame Analysis Tool**: Analyze video frames for visual assistance and content description
+
+### Stages SEI Publishing
+
+The `stages_sei/` directory contains a comprehensive SEI (Supplemental Enhancement Information) publishing system for embedding metadata directly into H.264 video streams.
+
+**What is SEI?**
+
+SEI NAL units are part of the H.264/AVC video compression standard that allow embedding additional metadata within the video stream itself. This metadata travels with the video frames, ensuring perfect synchronization between video content and associated data.
+
+**Key Features:**
+
+-   **Perfect Synchronization**: Metadata is embedded directly in video frames
+-   **Low Latency**: No separate data channels needed
+-   **Standards Compliant**: Uses official H.264 specification
+-   **Multi-format Support**: Handles Annex B, AVCC, and RTP H.264 formats
+-   **Automatic Integration**: Patches aiortc and PyAV encoders automatically
+-   **Reliable Delivery**: 3x repetition with client-side deduplication
+
+**Components:**
+
+-   **`sei_publisher.py`**: High-level interface for publishing SEI messages
+-   **`h264_sei_patch.py`**: Low-level H.264 encoder patching system
+-   **`SEI.md`**: Comprehensive documentation and usage guide
+
+**Usage Example:**
+
+```python
+from stages_sei import SeiPublisher, patch_h264_encoder, set_global_sei_publisher
+
+# Apply H.264 encoder patch (do this early in your application)
+patch_h264_encoder()
+
+# Create and configure SEI publisher
+sei_publisher = SeiPublisher()
+set_global_sei_publisher(sei_publisher)
+
+# Publish metadata
+await sei_publisher.publish_json({
+    "type": "chat_message",
+    "user": "alice",
+    "message": "Hello world!",
+    "timestamp": time.time()
+})
+```
+
+**Integration:**
+
+The Nova speech-to-speech script (`stages-nova-s2s/ivs-stage-nova-s2s.py`) demonstrates SEI publishing in action, embedding AI assistant responses directly into the video stream for synchronized delivery.
+
+**For detailed documentation, see [`stages_sei/SEI.md`](stages_sei/SEI.md).**
 
 ### Utility Scripts
 

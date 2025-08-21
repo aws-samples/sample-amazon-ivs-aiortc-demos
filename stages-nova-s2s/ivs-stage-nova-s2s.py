@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 # Apply H.264 SEI patch BEFORE importing aiortc
-import h264_sei_patch
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+import stages_sei.h264_sei_patch
 
 import asyncio
 import json

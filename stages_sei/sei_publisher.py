@@ -15,7 +15,7 @@ class SeiMessage:
     """Represents an SEI message to be published"""
 
     payload: bytes
-    repeat_count: int = 3
+    repeat_count: int = 3  # Default to 3x repetition for reliability
     timestamp: Optional[float] = None
 
     def __post_init__(self):
@@ -36,8 +36,8 @@ class SeiPublisher:
     SEI_PAYLOAD_TERMINATION = 0x80
     NAL_UNIT_TYPE_SEI = 0x06
 
-    # UUID for identifying our SEI messages (v4 UUID: 9e504ea5-ee5a-4f02-949f-b033a3768da2)
-    SEND_SEI_UUID = bytes([0x9E, 0x50, 0x4E, 0xA5, 0xEE, 0x5A, 0x4F, 0x02, 0x94, 0x9F, 0xB0, 0x33, 0xA3, 0x76, 0x8D, 0xA2])
+    # UUID for identifying our SEI messages (v4 UUID: b16d7d56-892e-419c-8d82-e069cd3aa5c1)
+    SEND_SEI_UUID = bytes([0xB1, 0x6D, 0x7D, 0x56, 0x89, 0x2E, 0x41, 0x9C, 0x8D, 0x82, 0xE0, 0x69, 0xCD, 0x3A, 0xA5, 0xC1])
 
     def __init__(self, max_retry_attempts: int = 3):
         """
@@ -126,8 +126,7 @@ class SeiPublisher:
             )
 
             # Log additional details for tracking
-            if "publish_sequence" in data:
-                logger.info(f"📡 Message #{data['publish_sequence']} queued: {data.get('role', 'unknown')} - repeat_count: {repeat_count}")
+            logger.info(f"📡 Message queued: {data.get('role', 'unknown')} - repeat_count: {repeat_count}")
             return True
 
         except Exception as e:
