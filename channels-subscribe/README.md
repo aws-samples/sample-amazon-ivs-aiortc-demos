@@ -25,7 +25,7 @@ A comprehensive Python toolkit for subscribing to and analyzing Amazon IVS (Inte
 
     ```bash
     git clone <repository-url>
-    cd ivs-channel-analysis
+    cd amazon-ivs-python-demos
     ```
 
 2. **Install Python dependencies:**
@@ -33,6 +33,8 @@ A comprehensive Python toolkit for subscribing to and analyzing Amazon IVS (Inte
     ```bash
     pip install -r requirements.txt
     ```
+
+    _Note: The `requirements.txt` file is located in the root directory of the project and contains dependencies for all sub-projects._
 
 3. **Configure AWS credentials** (for Bedrock analysis):
     ```bash
@@ -46,14 +48,20 @@ A comprehensive Python toolkit for subscribing to and analyzing Amazon IVS (Inte
 ## 📁 Project Structure
 
 ```
+amazon-ivs-python-demos/                        # Root project directory
 ├── channels-subscribe/                          # Channel subscription and analysis tools
+│   ├── README.md                                # This file
 │   ├── ivs-channel-subscribe-analyze-frames.py      # Frame-by-frame analysis with Claude
 │   ├── ivs-channel-subscribe-analyze-video.py       # Video segment analysis with Pegasus
 │   ├── ivs-channel-subscribe-analyze-audio-video.py # Combined audio/video analysis
 │   ├── ivs-channel-subscribe-transcribe.py          # Real-time transcription with Whisper
 │   └── ivs_metadata_publisher.py                   # Reusable IVS timed metadata publisher
-├── requirements.txt                             # Python dependencies
-└── README.md                                   # This file
+├── requirements.txt                             # Python dependencies (shared across all sub-projects)
+├── stages-publish/                              # Real-Time Stages publishing scripts
+├── stages-subscribe/                            # Real-Time Stages subscribing scripts
+├── stages-nova-s2s/                             # AI Speech-to-Speech scripts
+├── stages_sei/                                  # SEI Publishing System
+└── README.md                                   # Main project documentation
 ```
 
 ## 🎯 Scripts Overview
