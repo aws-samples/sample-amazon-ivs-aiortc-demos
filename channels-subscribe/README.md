@@ -418,26 +418,6 @@ import logging
 logging.getLogger().setLevel(logging.DEBUG)
 ```
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
--   Amazon Web Services for IVS and Bedrock services
--   OpenAI for Whisper speech recognition
--   TwelveLabs for Pegasus video analysis
--   PyAV team for FFmpeg Python bindings (used in analysis scripts)
--   OpenCV community for computer vision tools
-
 ## 📞 Support
 
 For issues and questions:
