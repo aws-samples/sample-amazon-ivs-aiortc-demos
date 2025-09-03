@@ -31,10 +31,11 @@ A comprehensive Python toolkit for subscribing to and analyzing Amazon IVS (Inte
 2. **Install Python dependencies:**
 
     ```bash
-    pip install -r requirements.txt
+    pip install -r ../requirements.txt
     ```
 
-    _Note: The `requirements.txt` file is located in the root directory of the project and contains dependencies for all sub-projects._
+> [!NOTE]
+> The `requirements.txt` file is located in the root directory of the project and contains dependencies for all sub-projects.
 
 3. **Configure AWS credentials** (for Bedrock analysis):
     ```bash
