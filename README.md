@@ -12,13 +12,17 @@ A comprehensive collection of Python demo scripts demonstrating various Amazon I
 -   [Installation](#installation)
 -   [Configuration](#configuration)
 -   [Sub-Projects](#sub-projects)
+    -   [Channels Subscribe](#channels-subscribe)
     -   [Stages Publish](#stages-publish)
     -   [Stages Subscribe](#stages-subscribe)
     -   [Stages Nova Speech-to-Speech](#stages-nova-speech-to-speech)
     -   [Stages SEI Publishing](#stages-sei-publishing)
 -   [Usage Examples](#usage-examples)
 -   [Troubleshooting](#troubleshooting)
+-   [Dependencies](#dependencies)
 -   [Contributing](#contributing)
+-   [License](#license)
+-   [Support](#support)
 
 ## Overview
 
