@@ -93,13 +93,19 @@ Analyzes individual video frames at configurable intervals using Amazon Bedrock 
 
 ```bash
 # Basic frame analysis
-python channels-subscribe/ivs-channel-subscribe-analyze-frames.py --playlist-url "https://example.com/playlist.m3u8" --highest-quality
+python channels-subscribe/ivs-channel-subscribe-analyze-frames.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality
 
 # Custom analysis interval with video display
-python channels-subscribe/ivs-channel-subscribe-analyze-frames.py --playlist-url "https://example.com/playlist.m3u8" --analysis-interval 10 --show-video
+python channels-subscribe/ivs-channel-subscribe-analyze-frames.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --analysis-interval 10 \
+  --show-video
 
 # Manual rendition selection
-python channels-subscribe/ivs-channel-subscribe-analyze-frames.py --playlist-url "https://example.com/playlist.m3u8"
+python channels-subscribe/ivs-channel-subscribe-analyze-frames.py \
+  --playlist-url "https://example.com/playlist.m3u8"
 ```
 
 ### 2. Video Analysis (`ivs-channel-subscribe-analyze-video.py`)
@@ -128,13 +134,20 @@ Records and analyzes video segments using TwelveLabs Pegasus for comprehensive c
 
 ```bash
 # Basic video analysis
-python channels-subscribe/ivs-channel-subscribe-analyze-video.py --playlist-url "https://example.com/playlist.m3u8" --highest-quality
+python channels-subscribe/ivs-channel-subscribe-analyze-video.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality
 
 # Custom recording duration
-python channels-subscribe/ivs-channel-subscribe-analyze-video.py --playlist-url "https://example.com/playlist.m3u8" --analysis-duration 15 --show-video
+python channels-subscribe/ivs-channel-subscribe-analyze-video.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --analysis-duration 15 \
+  --show-video
 
 # Different Bedrock region
-python channels-subscribe/ivs-channel-subscribe-analyze-video.py --playlist-url "https://example.com/playlist.m3u8" --bedrock-region us-west-2
+python channels-subscribe/ivs-channel-subscribe-analyze-video.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --bedrock-region us-west-2
 ```
 
 ### 3. Audio/Video Analysis (`ivs-channel-subscribe-analyze-audio-video.py`)
@@ -163,13 +176,19 @@ Advanced script that properly handles both audio and video streams using PyAV fo
 
 ```bash
 # Full audio/video analysis
-python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py --playlist-url "https://example.com/playlist.m3u8" --highest-quality
+python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality
 
 # Headless mode (no video display)
-python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py --playlist-url "https://example.com/playlist.m3u8" --lowest-quality
+python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --lowest-quality
 
 # Custom analysis duration
-python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py --playlist-url "https://example.com/playlist.m3u8" --analysis-duration 20
+python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --analysis-duration 20
 ```
 
 ### 4. Real-Time Transcription (`ivs-channel-subscribe-transcribe.py`)
@@ -200,19 +219,34 @@ Live speech-to-text transcription using OpenAI Whisper with support for multiple
 
 ```bash
 # Basic English transcription
-python channels-subscribe/ivs-channel-subscribe-transcribe.py --playlist-url "https://example.com/playlist.m3u8" --highest-quality
+python channels-subscribe/ivs-channel-subscribe-transcribe.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality
 
 # Spanish transcription with better model
-python channels-subscribe/ivs-channel-subscribe-transcribe.py --playlist-url "https://example.com/playlist.m3u8" --language es --whisper-model base
+python channels-subscribe/ivs-channel-subscribe-transcribe.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --language es \
+  --whisper-model base
 
 # Auto-detect language with video
-python channels-subscribe/ivs-channel-subscribe-transcribe.py --playlist-url "https://example.com/playlist.m3u8" --language auto --show-video --whisper-model small
+python channels-subscribe/ivs-channel-subscribe-transcribe.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --language auto \
+  --show-video \
+  --whisper-model small
 
 # Fast transcription with tiny model
-python channels-subscribe/ivs-channel-subscribe-transcribe.py --playlist-url "https://example.com/playlist.m3u8" --whisper-model tiny --chunk-duration 3
+python channels-subscribe/ivs-channel-subscribe-transcribe.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --whisper-model tiny \
+  --chunk-duration 3
 
 # Publish transcripts as timed metadata to the IVS channel
-python channels-subscribe/ivs-channel-subscribe-transcribe.py --playlist-url "https://example.com/playlist.m3u8" --highest-quality --publish-transcript-as-timed-metadata
+python channels-subscribe/ivs-channel-subscribe-transcribe.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality \
+  --publish-transcript-as-timed-metadata
 ```
 
 ## 📡 IVS Metadata Publisher Module
@@ -330,17 +364,24 @@ python script.py --playlist-url "url" # (remove --show-video)
 ```bash
 # Clear Whisper cache and retry
 rm -rf ~/.cache/whisper/
-python ivs-channel-subscribe-transcribe.py --playlist-url "url" --whisper-model tiny
+python ivs-channel-subscribe-transcribe.py \
+  --playlist-url "url" \
+  --whisper-model tiny
 ```
 
 #### 6. "Memory issues with large Whisper models"
 
 ```bash
 # Use smaller model or enable FP16
-python ivs-channel-subscribe-transcribe.py --playlist-url "url" --whisper-model tiny --fp16 true
+python ivs-channel-subscribe-transcribe.py \
+  --playlist-url "url" \
+  --whisper-model tiny \
+  --fp16 true
 
 # Or increase chunk duration to process less frequently
-python ivs-channel-subscribe-transcribe.py --playlist-url "url" --chunk-duration 10
+python ivs-channel-subscribe-transcribe.py \
+  --playlist-url "url" \
+  --chunk-duration 10
 ```
 
 ### Performance Tips
