@@ -2,6 +2,10 @@
 aiortc>=1.12.0
 av>=10.0.0
 
+# IVS HLS Channels
+opencv-python >= 4.12.0
+m3u8 >= 3.5.0
+
 # Audio transcription (using latest from GitHub for best compatibility)
 git+https://github.com/openai/whisper.git
 
