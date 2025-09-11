@@ -252,6 +252,17 @@ async def join_stage_as_publisher(token: str, agent_audio_track: AgentAudioTrack
     logger.info("🔵 Adding agent video track")
     pc.addTransceiver(agent_video_track, direction="sendrecv")
 
+    # Set peer connection for WebRTC stats collection
+    logger.info("🔗 About to set peer connection on audio track...")
+    try:
+        agent_audio_track.set_peer_connection(pc)
+        logger.info("🔗 Peer connection set successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to set peer connection: {e}")
+        import traceback
+
+        traceback.print_exc()
+
     logger.info("➕ Added tracks")
 
     await pc.setLocalDescription(await pc.createOffer())

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import numpy as np
+import time
 from fractions import Fraction
 from av import AudioFrame
 from aiortc import AudioStreamTrack
@@ -34,13 +35,93 @@ class AgentAudioTrack(AudioStreamTrack):
         # Track current audio session
         self.current_audio_session = None
 
+        # WebRTC stats debugging
+        self.last_stats_time = 0
+        self.stats_interval = 5.0  # Print stats every 5 seconds
+        self.peer_connection = None  # Will be set externally
+
+        # Performance tracking
+        self.frames_sent = 0
+        self.bytes_processed = 0
+        self.buffer_empty_count = 0
+        self.start_time = time.time()
+
         logger.info(
             f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
         )
 
+    def set_peer_connection(self, pc):
+        """Set the peer connection for stats collection"""
+        self.peer_connection = pc
+        logger.info(f"🔗 Peer connection set for WebRTC stats: {pc is not None}")
+
+    async def _print_debug_stats(self):
+        """Print WebRTC and performance stats every 5 seconds"""
+        current_time = time.time()
+        if current_time - self.last_stats_time >= self.stats_interval:
+            self.last_stats_time = current_time
+
+            # Calculate performance metrics
+            uptime = current_time - self.start_time
+            avg_fps = self.frames_sent / uptime if uptime > 0 else 0
+            avg_throughput = self.bytes_processed / uptime if uptime > 0 else 0
+            buffer_empty_rate = self.buffer_empty_count / self.frames_sent if self.frames_sent > 0 else 0
+
+            logger.info(
+                f"📊 Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
+                f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
+                f"Buffer empty rate: {buffer_empty_rate:.2%}"
+            )
+
+            # Try to get WebRTC stats if peer connection is available
+            if self.peer_connection:
+                try:
+                    logger.debug("🔍 Attempting to get WebRTC stats...")
+                    stats = await self.peer_connection.getStats()
+                    logger.debug(f"📊 Got {len(stats)} WebRTC stats objects")
+
+                    # Debug: print all stat types we're seeing
+                    stat_types = [getattr(stat, "type", "no-type") for stat in stats.values() if hasattr(stat, "type")]
+                    logger.debug(f"📊 Stat types found: {set(stat_types)}")
+
+                    # Look for relevant audio stats
+                    found_audio_stats = False
+                    found_network_stats = False
+
+                    for stat in stats.values():
+                        if hasattr(stat, "type"):
+                            if stat.type == "outbound-rtp" and hasattr(stat, "mediaType") and stat.mediaType == "audio":
+                                found_audio_stats = True
+                                logger.info(
+                                    f"📡 WebRTC Audio Out - Packets sent: {getattr(stat, 'packetsSent', 'N/A')}, "
+                                    f"Bytes sent: {getattr(stat, 'bytesSent', 'N/A')}, "
+                                    f"Packets lost: {getattr(stat, 'packetsLost', 'N/A')}"
+                                )
+                            elif stat.type == "candidate-pair" and hasattr(stat, "state") and stat.state == "succeeded":
+                                found_network_stats = True
+                                rtt = getattr(stat, "currentRoundTripTime", None)
+                                if rtt is not None:
+                                    logger.info(
+                                        f"🌐 Network - RTT: {rtt*1000:.1f}ms, "
+                                        f"Available outgoing bitrate: {getattr(stat, 'availableOutgoingBitrate', 'N/A')}"
+                                    )
+
+                    if not found_audio_stats:
+                        logger.debug("⚠️  No outbound audio RTP stats found")
+                    if not found_network_stats:
+                        logger.debug("⚠️  No successful candidate-pair stats found")
+
+                except Exception as e:
+                    logger.info(f"❌ Could not get WebRTC stats: {e}")
+            else:
+                logger.debug("⚠️  No peer connection available for stats")
+
     async def recv(self):
         """Generate and return audio frames from Nova responses - back to basics"""
         try:
+            # Print debug stats periodically
+            await self._print_debug_stats()
+
             # Capture buffer size for timing logic
             buffer_was_empty = False
 
@@ -69,6 +150,12 @@ class AgentAudioTrack(AudioStreamTrack):
                     chunk_data = bytes(self.chunk_size_bytes)
                     buffer_was_empty = True
 
+            # Track performance metrics
+            self.frames_sent += 1
+            self.bytes_processed += len(chunk_data)
+            if buffer_was_empty:
+                self.buffer_empty_count += 1
+
             # Convert bytes to numpy array
             audio_array = np.frombuffer(chunk_data, dtype=np.int16)
 
@@ -94,7 +181,9 @@ class AgentAudioTrack(AudioStreamTrack):
             if buffer_was_empty:
                 await asyncio.sleep(0.010)  # 10ms delay when no audio to catch final chunks
             else:
-                await asyncio.sleep(0.020)  # 20ms delay matches chunk duration
+                await asyncio.sleep(
+                    0.020
+                )  # 20ms delay matches chunk duration - changed to 1ms as this seems to negatively affect server based agents
 
             return frame
 
