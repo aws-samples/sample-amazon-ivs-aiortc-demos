@@ -46,6 +46,13 @@ class AgentAudioTrack(AudioStreamTrack):
         self.buffer_empty_count = 0
         self.start_time = time.time()
 
+        # Adaptive timing
+        self.target_fps = 50.0  # Target 50 FPS (20ms chunks)
+        self.current_delay_empty = 0.010  # Start with 10ms for empty buffer
+        self.current_delay_normal = 0.020  # Start with 20ms for normal
+        self.last_fps_check = time.time()
+        self.fps_check_interval = 2.0  # Adjust every 2 seconds
+
         logger.info(
             f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
         )
@@ -116,6 +123,39 @@ class AgentAudioTrack(AudioStreamTrack):
             else:
                 logger.debug("⚠️  No peer connection available for stats")
 
+            # Adaptive timing adjustment
+            self._adjust_timing_based_on_fps(avg_fps)
+
+    def _adjust_timing_based_on_fps(self, current_fps):
+        """Adjust timing delays based on actual FPS performance"""
+        current_time = time.time()
+        if current_time - self.last_fps_check >= self.fps_check_interval:
+            self.last_fps_check = current_time
+
+            if current_fps > 0:  # Only adjust if we have meaningful data
+                fps_ratio = current_fps / self.target_fps
+
+                if fps_ratio < 0.8:  # Running too slow (< 40 FPS)
+                    # Reduce delays to speed up
+                    self.current_delay_empty *= 0.8
+                    self.current_delay_normal *= 0.8
+                    logger.info(
+                        f"🐌 FPS too low ({current_fps:.1f}/{self.target_fps}), reducing delays to "
+                        f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
+                    )
+                elif fps_ratio > 1.2:  # Running too fast (> 60 FPS)
+                    # Increase delays to slow down
+                    self.current_delay_empty *= 1.2
+                    self.current_delay_normal *= 1.2
+                    logger.info(
+                        f"🐰 FPS too high ({current_fps:.1f}/{self.target_fps}), increasing delays to "
+                        f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
+                    )
+
+                # Keep delays within reasonable bounds
+                self.current_delay_empty = max(0.001, min(0.050, self.current_delay_empty))
+                self.current_delay_normal = max(0.001, min(0.050, self.current_delay_normal))
+
     async def recv(self):
         """Generate and return audio frames from Nova responses - back to basics"""
         try:
@@ -177,13 +217,11 @@ class AgentAudioTrack(AudioStreamTrack):
             # Update frame count
             self.frame_count += len(audio_array)
 
-            # Timing matched to chunk size (20ms chunks = 20ms delay)
+            # Adaptive timing based on performance
             if buffer_was_empty:
-                await asyncio.sleep(0.010)  # 10ms delay when no audio to catch final chunks
+                await asyncio.sleep(self.current_delay_empty)
             else:
-                await asyncio.sleep(
-                    0.020
-                )  # 20ms delay matches chunk duration - changed to 1ms as this seems to negatively affect server based agents
+                await asyncio.sleep(self.current_delay_normal)
 
             return frame
 
