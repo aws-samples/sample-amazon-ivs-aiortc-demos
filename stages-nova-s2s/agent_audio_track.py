@@ -81,6 +81,7 @@ class AgentAudioTrack(AudioStreamTrack):
             )
 
             # Try to get WebRTC stats if peer connection is available
+
             if self.peer_connection:
                 try:
                     logger.debug("🔍 Attempting to get WebRTC stats...")
@@ -97,21 +98,21 @@ class AgentAudioTrack(AudioStreamTrack):
 
                     for stat in stats.values():
                         if hasattr(stat, "type"):
-                            if stat.type == "outbound-rtp" and hasattr(stat, "mediaType") and stat.mediaType == "audio":
+                            # Audio outbound RTP stats
+                            if stat.type == "outbound-rtp" and hasattr(stat, "kind") and stat.kind == "audio":
                                 found_audio_stats = True
                                 logger.info(
                                     f"📡 WebRTC Audio Out - Packets sent: {getattr(stat, 'packetsSent', 'N/A')}, "
-                                    f"Bytes sent: {getattr(stat, 'bytesSent', 'N/A')}, "
-                                    f"Packets lost: {getattr(stat, 'packetsLost', 'N/A')}"
+                                    f"Bytes sent: {getattr(stat, 'bytesSent', 'N/A')}"
                                 )
-                            elif stat.type == "candidate-pair" and hasattr(stat, "state") and stat.state == "succeeded":
+                            # Network stats from remote inbound RTP (has RTT and jitter)
+                            elif stat.type == "remote-inbound-rtp":
                                 found_network_stats = True
-                                rtt = getattr(stat, "currentRoundTripTime", None)
+                                rtt = getattr(stat, "roundTripTime", None)
+                                jitter = getattr(stat, "jitter", None)
+                                packets_lost = getattr(stat, "packetsLost", None)
                                 if rtt is not None:
-                                    logger.info(
-                                        f"🌐 Network - RTT: {rtt*1000:.1f}ms, "
-                                        f"Available outgoing bitrate: {getattr(stat, 'availableOutgoingBitrate', 'N/A')}"
-                                    )
+                                    logger.info(f"🌐 Network - RTT: {rtt*1000:.1f}ms, " f"Jitter: {jitter}, Packets lost: {packets_lost}")
 
                     if not found_audio_stats:
                         logger.debug("⚠️  No outbound audio RTP stats found")
