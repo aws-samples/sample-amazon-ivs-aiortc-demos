@@ -53,6 +53,13 @@ class AgentAudioTrack(AudioStreamTrack):
         self.last_fps_check = time.time()
         self.fps_check_interval = 2.0  # Adjust every 2 seconds
 
+        # Dynamic chunk sizing
+        self.base_chunk_size_bytes = self.chunk_size_bytes  # Store original
+        self.last_network_check = time.time()
+        self.network_check_interval = 3.0  # Check network every 3 seconds
+        self.recent_rtt_samples = []
+        self.recent_jitter_samples = []
+
         logger.info(
             f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
         )
@@ -113,6 +120,8 @@ class AgentAudioTrack(AudioStreamTrack):
                                 packets_lost = getattr(stat, "packetsLost", None)
                                 if rtt is not None:
                                     logger.info(f"🌐 Network - RTT: {rtt*1000:.1f}ms, " f"Jitter: {jitter}, Packets lost: {packets_lost}")
+                                    # Collect network samples for chunk size adaptation
+                                    self._collect_network_sample(rtt, jitter)
 
                     if not found_audio_stats:
                         logger.debug("⚠️  No outbound audio RTP stats found")
@@ -126,6 +135,9 @@ class AgentAudioTrack(AudioStreamTrack):
 
             # Adaptive timing adjustment
             self._adjust_timing_based_on_fps(avg_fps)
+
+            # Adaptive chunk sizing based on network conditions
+            self._adjust_chunk_size_based_on_network()
 
     def _adjust_timing_based_on_fps(self, current_fps):
         """Adjust timing delays based on actual FPS performance"""
@@ -156,6 +168,61 @@ class AgentAudioTrack(AudioStreamTrack):
                 # Keep delays within reasonable bounds
                 self.current_delay_empty = max(0.001, min(0.050, self.current_delay_empty))
                 self.current_delay_normal = max(0.001, min(0.050, self.current_delay_normal))
+
+    def _collect_network_sample(self, rtt, jitter):
+        """Collect network performance samples for chunk size adaptation"""
+        current_time = time.time()
+
+        # Keep recent samples (last 10 seconds worth)
+        self.recent_rtt_samples.append((current_time, rtt))
+        self.recent_jitter_samples.append((current_time, jitter))
+
+        # Remove old samples
+        cutoff_time = current_time - 10.0
+        self.recent_rtt_samples = [(t, v) for t, v in self.recent_rtt_samples if t > cutoff_time]
+        self.recent_jitter_samples = [(t, v) for t, v in self.recent_jitter_samples if t > cutoff_time]
+
+    def _adjust_chunk_size_based_on_network(self):
+        """Adjust chunk size based on network conditions"""
+        current_time = time.time()
+        if current_time - self.last_network_check >= self.network_check_interval:
+            self.last_network_check = current_time
+
+            if len(self.recent_rtt_samples) >= 3 and len(self.recent_jitter_samples) >= 3:
+                # Calculate network stability metrics
+                rtt_values = [v for _, v in self.recent_rtt_samples]
+                jitter_values = [v for _, v in self.recent_jitter_samples]
+
+                avg_rtt = sum(rtt_values) / len(rtt_values)
+                avg_jitter = sum(jitter_values) / len(jitter_values)
+                rtt_variance = max(rtt_values) - min(rtt_values)
+
+                # Determine optimal chunk size based on network conditions
+                old_chunk_size = self.chunk_size_bytes
+
+                if avg_jitter > 1500 or rtt_variance > 0.050:  # High jitter or RTT variance
+                    # Use larger chunks for stability (40ms)
+                    self.chunk_size_bytes = int(self.sample_rate * 0.040 * 2)  # 40ms chunks
+                    reason = f"high jitter ({avg_jitter:.0f}) or RTT variance ({rtt_variance*1000:.1f}ms)"
+                elif avg_rtt > 0.080:  # High RTT (>80ms)
+                    # Use larger chunks to compensate for latency (30ms)
+                    self.chunk_size_bytes = int(self.sample_rate * 0.030 * 2)  # 30ms chunks
+                    reason = f"high RTT ({avg_rtt*1000:.1f}ms)"
+                elif avg_jitter < 100 and avg_rtt < 0.040:  # Excellent network
+                    # Use smaller chunks for low latency (15ms)
+                    self.chunk_size_bytes = int(self.sample_rate * 0.015 * 2)  # 15ms chunks
+                    reason = f"excellent network (RTT: {avg_rtt*1000:.1f}ms, jitter: {avg_jitter:.0f})"
+                else:
+                    # Use default chunk size (20ms)
+                    self.chunk_size_bytes = self.base_chunk_size_bytes
+                    reason = "balanced network conditions"
+
+                # Update minimum buffer threshold based on new chunk size
+                self.min_buffer_threshold = self.chunk_size_bytes * 3
+
+                if old_chunk_size != self.chunk_size_bytes:
+                    chunk_duration_ms = (self.chunk_size_bytes // 2) / self.sample_rate * 1000
+                    logger.info(f"📦 Chunk size adapted: {old_chunk_size} → {self.chunk_size_bytes} bytes " f"({chunk_duration_ms:.1f}ms) - {reason}")
 
     async def recv(self):
         """Generate and return audio frames from Nova responses - back to basics"""
