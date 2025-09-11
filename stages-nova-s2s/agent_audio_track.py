@@ -121,7 +121,7 @@ class AgentAudioTrack(AudioStreamTrack):
                                 if rtt is not None:
                                     logger.info(f"🌐 Network - RTT: {rtt*1000:.1f}ms, " f"Jitter: {jitter}, Packets lost: {packets_lost}")
                                     # Collect network samples for chunk size adaptation
-                                    self._collect_network_sample(rtt, jitter)
+                                    # DISABLED: self._collect_network_sample(rtt, jitter)
 
                     if not found_audio_stats:
                         logger.debug("⚠️  No outbound audio RTP stats found")
@@ -137,7 +137,8 @@ class AgentAudioTrack(AudioStreamTrack):
             self._adjust_timing_based_on_fps(avg_fps)
 
             # Adaptive chunk sizing based on network conditions
-            self._adjust_chunk_size_based_on_network()
+            # DISABLED: Causes audio jitter due to frequent chunk size changes
+            # self._adjust_chunk_size_based_on_network()
 
     def _adjust_timing_based_on_fps(self, current_fps):
         """Adjust timing delays based on actual FPS performance"""
