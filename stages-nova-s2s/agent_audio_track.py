@@ -168,8 +168,8 @@ class AgentAudioTrack(AudioStreamTrack):
                     )
                 elif fps_ratio > 1.2:  # Running too fast (> 60 FPS)
                     # Increase delays to slow down
-                    self.current_delay_empty *= 1.2
-                    self.current_delay_normal *= 1.2
+                    self.current_delay_empty *= 0.8
+                    self.current_delay_normal *= 0.8
                     logger.debug(
                         f"🐰 FPS too high ({current_fps:.1f}/{self.target_fps}), increasing delays to "
                         f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
