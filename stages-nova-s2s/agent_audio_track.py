@@ -51,7 +51,7 @@ class AgentAudioTrack(AudioStreamTrack):
         self.current_delay_empty = 0.010  # Start with 10ms for empty buffer
         self.current_delay_normal = 0.020  # Start with 20ms for normal
         self.last_fps_check = time.time()
-        self.fps_check_interval = 2.0  # Adjust every 2 seconds
+        self.fps_check_interval = 0.5  # Adjust every 500ms for more responsive tuning
 
         # Dynamic chunk sizing
         self.base_chunk_size_bytes = self.chunk_size_bytes  # Store original
@@ -108,7 +108,7 @@ class AgentAudioTrack(AudioStreamTrack):
                             # Audio outbound RTP stats
                             if stat.type == "outbound-rtp" and hasattr(stat, "kind") and stat.kind == "audio":
                                 found_audio_stats = True
-                                logger.info(
+                                logger.debug(
                                     f"📡 WebRTC Audio Out - Packets sent: {getattr(stat, 'packetsSent', 'N/A')}, "
                                     f"Bytes sent: {getattr(stat, 'bytesSent', 'N/A')}"
                                 )
@@ -119,7 +119,7 @@ class AgentAudioTrack(AudioStreamTrack):
                                 jitter = getattr(stat, "jitter", None)
                                 packets_lost = getattr(stat, "packetsLost", None)
                                 if rtt is not None:
-                                    logger.info(f"🌐 Network - RTT: {rtt*1000:.1f}ms, " f"Jitter: {jitter}, Packets lost: {packets_lost}")
+                                    logger.debug(f"🌐 Network - RTT: {rtt*1000:.1f}ms, " f"Jitter: {jitter}, Packets lost: {packets_lost}")
                                     # Collect network samples for chunk size adaptation
                                     # DISABLED: self._collect_network_sample(rtt, jitter)
 
@@ -153,7 +153,7 @@ class AgentAudioTrack(AudioStreamTrack):
                     # Reduce delays to speed up
                     self.current_delay_empty *= 0.8
                     self.current_delay_normal *= 0.8
-                    logger.info(
+                    logger.debug(
                         f"🐌 FPS too low ({current_fps:.1f}/{self.target_fps}), reducing delays to "
                         f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
                     )
@@ -161,7 +161,7 @@ class AgentAudioTrack(AudioStreamTrack):
                     # Increase delays to slow down
                     self.current_delay_empty *= 1.2
                     self.current_delay_normal *= 1.2
-                    logger.info(
+                    logger.debug(
                         f"🐰 FPS too high ({current_fps:.1f}/{self.target_fps}), increasing delays to "
                         f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
                     )

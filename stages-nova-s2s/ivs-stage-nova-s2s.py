@@ -56,7 +56,7 @@ warnings.filterwarnings("ignore")
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ivs-stage-nova-s2s")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 aiortc_logger = logging.getLogger("aiortc")
 aiortc_logger.setLevel(logging.ERROR)
 
