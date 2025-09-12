@@ -518,6 +518,14 @@ python ivs-stage-nova-s2s.py \
 -   **Weather Tool**: Get current weather and 5-day forecast (requires `WEATHER_API_KEY`)
 -   **Frame Analysis Tool**: Analyze video frames for visual assistance and content description
 
+#### Assistant Management
+
+For automated management of multiple Nova assistant instances via WebSocket integration with IVS Chat, see:
+
+**[IVS Stage Assistant Manager Documentation](stages-nova-s2s/MANAGING_ASSISTANT_DEMO.md)**
+
+This companion tool allows you to dynamically launch and manage multiple Nova S2S instances based on chat messages, perfect for scaling AI assistants across multiple participants.
+
 ### Stages SEI Publishing
 
 The `stages_sei/` directory contains a comprehensive SEI (Supplemental Enhancement Information) publishing system for embedding metadata directly into H.264 video streams.

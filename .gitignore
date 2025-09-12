@@ -12,3 +12,4 @@ bandit*
 .kiro
 bandit_first_scan.txt
 bandit_fixed_scan.txt
+.env
