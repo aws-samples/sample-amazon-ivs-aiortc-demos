@@ -160,8 +160,8 @@ class AgentAudioTrack(AudioStreamTrack):
 
                 if fps_ratio < 0.8:  # Running too slow (< 40 FPS)
                     # Reduce delays to speed up
-                    self.current_delay_empty *= 0.8
-                    self.current_delay_normal *= 0.8
+                    self.current_delay_empty *= 0.5
+                    self.current_delay_normal *= 0.5
                     logger.debug(
                         f"🐌 FPS too low ({current_fps:.1f}/{self.target_fps}), reducing delays to "
                         f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
