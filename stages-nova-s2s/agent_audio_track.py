@@ -32,6 +32,12 @@ class AgentAudioTrack(AudioStreamTrack):
         self.max_buffer_size = sample_rate * 2 * 30  # 30 seconds max
         self.min_buffer_threshold = self.chunk_size_bytes * 3  # Keep 3 chunks minimum
 
+        # Audio batching for performance
+        self.batch_buffer = bytearray()
+        self.batch_size = self.chunk_size_bytes * 4  # Batch 4 chunks at a time (80ms)
+        self.last_batch_time = time.time()
+        self.batch_timeout = 0.040  # Force batch processing after 40ms max
+
         # Track current audio session
         self.current_audio_session = None
 
@@ -81,10 +87,13 @@ class AgentAudioTrack(AudioStreamTrack):
             avg_throughput = self.bytes_processed / uptime if uptime > 0 else 0
             buffer_empty_rate = self.buffer_empty_count / self.frames_sent if self.frames_sent > 0 else 0
 
+            # Get current batch buffer size for stats
+            batch_buffer_size = len(self.batch_buffer)
+
             logger.info(
                 f"📊 Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
                 f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
-                f"Buffer empty rate: {buffer_empty_rate:.2%}"
+                f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
             )
 
             # Try to get WebRTC stats if peer connection is available
@@ -231,6 +240,11 @@ class AgentAudioTrack(AudioStreamTrack):
             # Print debug stats periodically
             await self._print_debug_stats()
 
+            # Check if we need to flush batch due to timeout
+            current_time = time.time()
+            if len(self.batch_buffer) > 0 and current_time - self.last_batch_time >= self.batch_timeout:
+                await self.flush_batch()
+
             # Capture buffer size for timing logic
             buffer_was_empty = False
 
@@ -299,7 +313,7 @@ class AgentAudioTrack(AudioStreamTrack):
             raise
 
     async def add_audio_data(self, audio_data: bytes):
-        """Add audio data to the buffer for streaming"""
+        """Add audio data to the batch buffer for efficient processing"""
         try:
             async with self.buffer_lock:
                 old_buffer_size = len(self.audio_buffer)
@@ -308,29 +322,62 @@ class AgentAudioTrack(AudioStreamTrack):
                 if not audio_data or len(audio_data) == 0:
                     return
 
-                self.audio_buffer.extend(audio_data)
-                new_buffer_size = len(self.audio_buffer)
+                # Add to batch buffer first
+                self.batch_buffer.extend(audio_data)
+                current_time = time.time()
 
-                # Detailed logging to understand buffer behavior
-                # logger.info(f"🎵 Buffer: {old_buffer_size} -> {new_buffer_size} bytes (+{len(audio_data)})")
+                # Process batch if it's large enough or timeout reached
+                should_process_batch = len(self.batch_buffer) >= self.batch_size or (
+                    len(self.batch_buffer) > 0 and current_time - self.last_batch_time >= self.batch_timeout
+                )
 
-                if old_buffer_size == 0 and new_buffer_size > 0:
-                    logger.info(f"🎵 Audio started: +{len(audio_data)} bytes")
+                if should_process_batch:
+                    # Move batched data to main buffer
+                    batch_data = bytes(self.batch_buffer)
+                    self.batch_buffer.clear()
+                    self.last_batch_time = current_time
 
-                # Prevent buffer from growing too large
-                if len(self.audio_buffer) > self.max_buffer_size:
-                    # Remove oldest data more conservatively
-                    excess = len(self.audio_buffer) - (self.max_buffer_size // 2)
-                    del self.audio_buffer[:excess]
-                    logger.warning(f"Audio buffer too large, removed {excess} bytes")
+                    self.audio_buffer.extend(batch_data)
+                    new_buffer_size = len(self.audio_buffer)
+
+                    # Log batch processing
+                    if old_buffer_size == 0 and new_buffer_size > 0:
+                        logger.info(f"🎵 Audio started: +{len(batch_data)} bytes (batched)")
+                    else:
+                        logger.debug(f"🎵 Batch processed: +{len(batch_data)} bytes, buffer: {new_buffer_size} bytes")
+
+                    # Prevent buffer from growing too large
+                    if len(self.audio_buffer) > self.max_buffer_size:
+                        # Remove oldest data more conservatively
+                        excess = len(self.audio_buffer) - (self.max_buffer_size // 2)
+                        del self.audio_buffer[:excess]
+                        logger.warning(f"Audio buffer too large, removed {excess} bytes")
+                else:
+                    # Just accumulating in batch buffer
+                    logger.debug(f"🎵 Batching: {len(self.batch_buffer)}/{self.batch_size} bytes")
 
         except Exception as e:
             logger.error(f"Error adding audio data: {e}")
+
+    async def flush_batch(self):
+        """Force process any remaining batched audio data"""
+        try:
+            async with self.buffer_lock:
+                if len(self.batch_buffer) > 0:
+                    batch_data = bytes(self.batch_buffer)
+                    self.batch_buffer.clear()
+                    self.last_batch_time = time.time()
+
+                    self.audio_buffer.extend(batch_data)
+                    logger.debug(f"🎵 Batch flushed: +{len(batch_data)} bytes")
+        except Exception as e:
+            logger.error(f"Error flushing batch: {e}")
 
     async def stop_current_audio(self):
         """Stop current audio playback by clearing the buffer (for interruptions)"""
         async with self.buffer_lock:
             self.audio_buffer.clear()
+            self.batch_buffer.clear()  # Clear batch buffer too
             self.current_audio_session = None
             logger.info("🛑 Audio buffer cleared due to interruption")
 
@@ -342,3 +389,4 @@ class AgentAudioTrack(AudioStreamTrack):
         """Stop the audio track"""
         async with self.buffer_lock:
             self.audio_buffer.clear()
+            self.batch_buffer.clear()  # Clear batch buffer too
