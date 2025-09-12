@@ -419,6 +419,14 @@ This script uses the SEI (Supplemental Enhancement Information) publishing syste
 
 **For detailed SEI documentation, see [`../stages_sei/SEI.md`](../stages_sei/SEI.md).**
 
+## Assistant Management
+
+For automated management of multiple Nova assistant instances via WebSocket integration with IVS Chat, see:
+
+**[IVS Stage Assistant Manager Documentation](./MANAGING_ASSISTANT_DEMO.md)**
+
+This companion tool allows you to dynamically launch and manage multiple Nova S2S instances based on chat messages, perfect for scaling AI assistants across multiple participants.
+
 ---
 
 _This script demonstrates advanced integration between Amazon IVS Real-Time Stages, Amazon Nova Sonic, Amazon Bedrock Claude, and SEI publishing, showcasing real-time conversational AI capabilities with synchronized metadata delivery in live video environments._
