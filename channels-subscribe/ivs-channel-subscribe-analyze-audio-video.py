@@ -70,14 +70,23 @@ class AudioVideoChunkRecorder:
         logger.info(f"✅ Recorded {len(self.recorded_audio_frames)} audio frames")
         return self.recorded_video_frames.copy(), self.recorded_audio_frames.copy()
 
-    def process_video_frame(self, cv_frame):
-        """Process a video frame from OpenCV"""
+    def process_video_frame(self, frame):
+        """Process a video frame (can be av.VideoFrame or numpy array)"""
         if self.recording:
-            # Convert OpenCV frame (BGR) to RGB
-            rgb_frame = cv2.cvtColor(cv_frame, cv2.COLOR_BGR2RGB)
-            # Convert to av.VideoFrame
-            av_frame = av.VideoFrame.from_ndarray(rgb_frame, format="rgb24")
-            self.recorded_video_frames.append(av_frame)
+            if isinstance(frame, av.VideoFrame):
+                # Already an av.VideoFrame, just append it
+                self.recorded_video_frames.append(frame)
+            else:
+                # Assume it's a numpy array from OpenCV (BGR format)
+                try:
+                    # Convert OpenCV frame (BGR) to RGB
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    # Convert to av.VideoFrame
+                    av_frame = av.VideoFrame.from_ndarray(rgb_frame, format="rgb24")
+                    self.recorded_video_frames.append(av_frame)
+                except Exception as e:
+                    logger.warning(f"Error processing video frame: {e}")
+                    # Skip this frame if conversion fails
 
     def process_audio_frame(self, av_frame):
         """Process an audio frame from PyAV"""
