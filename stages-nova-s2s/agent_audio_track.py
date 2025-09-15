@@ -301,6 +301,9 @@ class AgentAudioTrack(AudioStreamTrack):
             self.frame_count += len(audio_array)
 
             # Adaptive timing based on performance
+            # this appears to not be necessary
+            # and in fact actually harms performance
+            # so it is commented out for now
             if buffer_was_empty:
                 # await asyncio.sleep(self.current_delay_empty)
                 pass
