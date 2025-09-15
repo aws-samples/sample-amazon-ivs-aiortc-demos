@@ -302,9 +302,11 @@ class AgentAudioTrack(AudioStreamTrack):
 
             # Adaptive timing based on performance
             if buffer_was_empty:
-                await asyncio.sleep(self.current_delay_empty)
+                # await asyncio.sleep(self.current_delay_empty)
+                pass
             else:
-                await asyncio.sleep(self.current_delay_normal)
+                # await asyncio.sleep(self.current_delay_normal)
+                pass
 
             return frame
 
