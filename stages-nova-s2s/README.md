@@ -41,6 +41,9 @@ This script integrates Amazon IVS Real-Time Stages with Amazon Nova Sonic for AI
 
     # Optional: For weather functionality
     export WEATHER_API_KEY=your_weather_api_key
+
+    # Optional: For web search functionality
+    export BRAVE_API_KEY=your_brave_api_key
     ```
 
 ## Usage
@@ -70,6 +73,11 @@ python ivs-stage-nova-s2s.py \
 -   `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
 -   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
 -   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+
+#### API Configuration
+
+-   `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
+-   `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
 
 #### Performance Configuration
 
@@ -120,16 +128,17 @@ The Nova AI assistant has access to the following tools:
 
 **Description**:
 
-Get current date and time information
+Get current date and time information for specific locations
 
 **Parameters**:
 
--   `timezone` (optional): Timezone for the date/time (defaults to local)
+-   `location` (required): Location name to get date/time for (e.g., 'New York', 'London', 'Tokyo')
+-   `timezone` (optional): Timezone override (e.g., 'America/New_York', 'Europe/London')
 
 **Example conversation**:
 
--   User: "What time is it?"
--   Nova: "It's currently 2:30 PM on Tuesday, July 8th, 2025."
+-   User: "What time is it in New York?"
+-   Nova: "It's currently 2:30 PM on Tuesday, July 8th, 2025 in New York (Eastern Daylight Time)."
 
 ### 2. Weather Tool
 
@@ -167,7 +176,46 @@ Get current weather information and 5-day forecast for any location
 -   Postal codes: "10001", "SW1A 1AA"
 -   Coordinates: "40.7128,-74.0060"
 
-### 3. Frame Analysis Tool
+### 3. Web Search Tool
+
+**Function**:
+
+`webSearchTool`
+
+**Description**:
+
+Search the web for current information, news, facts, or answers to questions
+
+**Parameters**:
+
+-   `query` (required): Search query to find information on the web
+-   `count` (optional): Number of search results to return (default: 5, maximum: 20)
+
+**Requirements**:
+
+-   `BRAVE_API_KEY` environment variable must be set
+-   Uses Brave Search API service
+
+**Example conversation**:
+
+-   User: "What's the latest news about AI?"
+-   Nova: "Based on my web search, here are the latest AI developments: Recent breakthroughs in large language models have shown significant improvements in reasoning capabilities, with several companies announcing new AI models this week. There's also growing discussion about AI safety regulations and their potential impact on the industry."
+
+**Response includes**:
+
+-   **Search results**: Title, URL, description, and publication date for each result
+-   **Query information**: Original query, any spelling corrections, and search metadata
+-   **Result count**: Total number of results found and returned
+
+**Supported query types**:
+
+-   Current events: "latest news about climate change"
+-   Factual information: "population of Tokyo 2024"
+-   Product information: "iPhone 15 price and specs"
+-   How-to queries: "how to bake chocolate chip cookies"
+-   Definitions: "what is quantum computing"
+
+### 4. Frame Analysis Tool
 
 **Function**:
 
@@ -203,7 +251,9 @@ Analyze video frames from the live stream using AI
 -   Interactive visual conversations
 -   Environmental awareness for AI assistant
 
-## Weather API Setup
+## API Setup
+
+### Weather API Setup
 
 1. **Get API Key**:
 
@@ -219,7 +269,25 @@ Analyze video frames from the live stream using AI
 
 3. **Verify Setup**:
     - When you run the script, you should see: "🌤️ Weather tool is available"
-    - If not configured: "⚠️ WEATHER_API_KEY environment variable not found. Weather tool will not be available."
+    - If not configured: "⚠️ `weather_api_key` not found. Weather tool will not be available."
+
+### Web Search API Setup
+
+1. **Get API Key**:
+
+    - Visit [Brave Search API](https://api.search.brave.com/)
+    - Sign up for a free account
+    - Get your API key from the dashboard
+
+2. **Set Environment Variable**:
+
+    ```bash
+    export BRAVE_API_KEY=your_api_key_here
+    ```
+
+3. **Verify Setup**:
+    - When you run the script, you should see: "🔍 Web search tool is available"
+    - If not configured: "⚠️ `brave_api_key` not found. Web search tool will not be available."
 
 ## Technical Details
 
@@ -279,20 +347,27 @@ Analyze video frames from the live stream using AI
     - Check API key validity at WeatherAPI.com
     - Ensure internet connectivity for API requests
 
-3. **Frame Analysis Issues**:
+3. **Web Search Tool Not Working**:
+
+    - Verify `BRAVE_API_KEY` environment variable is set
+    - Check API key validity at Brave Search API dashboard
+    - Ensure internet connectivity for API requests
+    - Check API rate limits and usage quotas
+
+4. **Frame Analysis Issues**:
 
     - Verify AWS credentials have `bedrock:InvokeModel` permissions
     - Check Claude model availability in your region
     - Ensure video track is receiving frames
     - Monitor Bedrock usage and costs
 
-4. **Poor Audio Quality**:
+5. **Poor Audio Quality**:
 
     - Check network bandwidth and stability
     - Verify audio input device quality
     - Monitor CPU usage during processing
 
-5. **WebRTC Connection Issues**:
+6. **WebRTC Connection Issues**:
     - Check firewall settings for WebRTC traffic
     - Verify IVS stage ARN and token validity
     - Monitor network connectivity
@@ -352,6 +427,12 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 -   1 call per second rate limit
 -   Current weather data only
 
+### Brave Search API Free Tier
+
+-   2,000 queries per month
+-   Rate limits apply per API key
+-   Web search results only
+
 ### Amazon Nova Sonic
 
 -   Regional availability varies
@@ -384,10 +465,10 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 
 ### Date/Time Queries
 
--   "What time is it?"
--   "What's today's date?"
--   "What day of the week is it?"
--   "What time is it in Tokyo?" (with timezone support)
+-   "What time is it in New York?"
+-   "What's today's date in London?"
+-   "What day of the week is it in Tokyo?"
+-   "What time is it in Los Angeles right now?"
 
 ### Visual Queries (Frame Analysis)
 
@@ -398,6 +479,15 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 -   "What objects are visible in the room?"
 -   "Can you read any text in the image?"
 
+### Web Search Queries
+
+-   "What's the latest news about AI?"
+-   "Search for information about climate change"
+-   "What's the current price of Bitcoin?"
+-   "Find recent articles about space exploration"
+-   "Search for the best restaurants in Paris"
+-   "What are the latest developments in renewable energy?"
+
 ### Combined Queries
 
 -   "What's the weather and time in New York?"
@@ -405,6 +495,7 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 -   "What's the forecast for the weekend in Chicago?"
 -   "Should I bring an umbrella tomorrow in London?"
 -   "What do you see and what's the weather like outside?"
+-   "Search for current events and tell me the time in London"
 
 ## SEI Publishing System
 

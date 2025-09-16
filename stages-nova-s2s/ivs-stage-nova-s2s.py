@@ -54,17 +54,35 @@ from bedrock_stream_manager import BedrockStreamManager
 warnings.filterwarnings("ignore")
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
 logger = logging.getLogger("ivs-stage-nova-s2s")
 logger.setLevel(logging.INFO)
+
+# Set DEBUG level for our modules
+agent_audio_logger = logging.getLogger("agent_audio_track")
+agent_audio_logger.setLevel(logging.INFO)
+bedrock_logger = logging.getLogger("bedrock_stream_manager")
+bedrock_logger.setLevel(logging.INFO)
+agent_tools_logger = logging.getLogger("agent_tools")
+agent_tools_logger.setLevel(logging.INFO)
+
+# Suppress noisy external loggers
 aiortc_logger = logging.getLogger("aiortc")
 aiortc_logger.setLevel(logging.ERROR)
-
-# Suppress noisy STUN transaction timeout errors
 aioice_logger = logging.getLogger("aioice")
 aioice_logger.setLevel(logging.CRITICAL)
 stun_logger = logging.getLogger("aioice.stun")
 stun_logger.setLevel(logging.CRITICAL)
+
+# Suppress AWS SDK debug noise
+aws_event_stream_logger = logging.getLogger("smithy_aws_event_stream")
+aws_event_stream_logger.setLevel(logging.WARNING)
+aws_event_stream_aio_logger = logging.getLogger("smithy_aws_event_stream.aio")
+aws_event_stream_aio_logger.setLevel(logging.WARNING)
+aws_bedrock_logger = logging.getLogger("aws_sdk_bedrock_runtime")
+aws_bedrock_logger.setLevel(logging.WARNING)
+smithy_core_logger = logging.getLogger("smithy_aws_core")
+smithy_core_logger.setLevel(logging.WARNING)
 
 # Log that the aioice timeout patch was applied
 logger.info(f"🧊 Applied aioice timeout patch: ICE gathering timeout reduced from 5s to {ICE_TIMEOUT}s")
@@ -473,6 +491,12 @@ def parse_args():
         help="Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)",
     )
 
+    # Web search API options
+    parser.add_argument(
+        "--brave-api-key",
+        help="Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)",
+    )
+
     return parser.parse_args()
 
 
@@ -538,6 +562,9 @@ async def main():
         # Get weather API key from argument or environment variable
         weather_api_key = args.weather_api_key or os.getenv("WEATHER_API_KEY")
 
+        # Get Brave Search API key from argument or environment variable
+        brave_api_key = args.brave_api_key or os.getenv("BRAVE_API_KEY")
+
         # Initialize Nova stream manager
         logger.info("🤖 Initializing Nova speech-to-speech...")
         # fmt:off
@@ -547,6 +574,7 @@ async def main():
             model_id=args.nova_model_id, 
             region=args.nova_region,
             weather_api_key=weather_api_key,
+            brave_api_key=brave_api_key,
             enable_frame_analysis=enable_frame_analysis,
             analysis_model_id=args.bedrock_model_id,
             analysis_region=args.bedrock_region

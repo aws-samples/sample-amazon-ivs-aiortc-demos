@@ -14,27 +14,44 @@ logger = logging.getLogger(__name__)
 
 class AgentTools:
 
-    def __init__(self, region="us-east-1",model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"):
+    def __init__(self, region="us-east-1", model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"):
         self.region = region
         self.model_id = model_id
         self.bedrock_client = boto3.client("bedrock-runtime", region_name=self.region)
 
-    def getdateandtime(self, tz: str):
-        target_timezone = ""
-        now = datetime.datetime.now()
-        if tz:
+    def getdateandtime(self, location: str, tz: str = None):
+        """
+        Get current date and time for a specific location
+
+        Args:
+            location: Location name (e.g., "New York", "London", "Tokyo")
+            tz: Optional timezone override (e.g., "America/New_York")
+        """
+        try:
+            # If no timezone specified, return error asking for clarification
+            if not tz:
+                return {
+                    "error": f"Unable to determine timezone for location '{location}'. Please specify the timezone (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo') or provide a more specific location."
+                }
+
             target_timezone = pytz.timezone(tz)
             now = datetime.datetime.now(target_timezone)
 
-        return {
-            "formattedTime": now.strftime("%I:%M %p"),
-            "date": now.strftime("%Y-%m-%d"),
-            "year": now.year,
-            "month": now.month,
-            "day": now.day,
-            "dayOfWeek": now.strftime("%A").upper(),
-            "timezone": "Local",
-        }
+            return {
+                "location": location,
+                "formattedTime": now.strftime("%I:%M %p"),
+                "date": now.strftime("%Y-%m-%d"),
+                "year": now.year,
+                "month": now.month,
+                "day": now.day,
+                "dayOfWeek": now.strftime("%A").upper(),
+                "timezone": str(target_timezone),
+                "timezone_abbreviation": now.strftime("%Z"),
+                "utc_offset": now.strftime("%z"),
+            }
+        except Exception as e:
+            logger.error(f"Error getting date/time for location '{location}': {e}")
+            return {"error": f"Failed to get date/time for location '{location}': {str(e)}"}
 
     def getweather(self, location: str, weather_api_key: str):
         try:
@@ -125,7 +142,7 @@ class AgentTools:
         except Exception as e:
             logger.error(f"Error converting frame to base64: {e}")
             return None
-          
+
     async def analyzeframe(self, frame, prompt=None, timeout=30) -> Optional[str]:
         """
         Analyze a video frame using Claude
@@ -140,20 +157,19 @@ class AgentTools:
         try:
             # Convert frame to base64 (CPU intensive - run in thread pool)
             loop = asyncio.get_event_loop()
-            
+
             # Add timeout for frame conversion
             frame_base64 = await asyncio.wait_for(
-                loop.run_in_executor(None, self.frame_to_base64, frame),
-                timeout=10  # 10 seconds for frame conversion
+                loop.run_in_executor(None, self.frame_to_base64, frame), timeout=10  # 10 seconds for frame conversion
             )
-            
+
             if not frame_base64:
                 logger.warning("Frame to base64 conversion failed")
                 return None
 
             # Prepare the message for Claude
             bedrock_prompt = "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. This could be used for content discovery, moderation, or accessibility purposes. Be specific and comprehensive. Refer to subjects in the image as 'you' and say things like 'your' or 'you are' instead of talking about the subject in the third-person. Pretend like you know them personally and are responding directly to them conversationally instead of describing the scene to a third-party."
-            if(prompt):
+            if prompt:
                 bedrock_prompt += f"The user has specifically asked for the following information: '{prompt}'"
             message = {
                 "role": "user",
@@ -172,18 +188,12 @@ class AgentTools:
             def bedrock_call():
                 return self.bedrock_client.invoke_model(
                     modelId=self.model_id,
-                    body=json.dumps({
-                        "anthropic_version": "bedrock-2023-05-31", 
-                        "max_tokens": 100, 
-                        "messages": [message], 
-                        "temperature": 0.4
-                    }),
+                    body=json.dumps({"anthropic_version": "bedrock-2023-05-31", "max_tokens": 100, "messages": [message], "temperature": 0.4}),
                 )
 
             # Add timeout for Bedrock API call
             response = await asyncio.wait_for(
-                loop.run_in_executor(None, bedrock_call),
-                timeout=timeout - 10  # Reserve 10 seconds for frame conversion
+                loop.run_in_executor(None, bedrock_call), timeout=timeout - 10  # Reserve 10 seconds for frame conversion
             )
 
             # Parse response
@@ -201,6 +211,84 @@ class AgentTools:
         except Exception as e:
             logger.error(f"Error analyzing frame: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
+    def websearch(self, query: str, brave_api_key: str, count: int = 5):
+        """
+        Search the web using Brave Search API
+
+        Args:
+            query: Search query string
+            brave_api_key: Brave Search API key
+            count: Number of results to return (default: 5, max: 20)
+        """
+        try:
+            if not query:
+                return {"error": "Query parameter is required"}
+
+            if not brave_api_key:
+                return {"error": "Brave API key is required"}
+
+            logger.info(f"🔍 Searching web for: {query}")
+
+            # Brave Search API endpoint
+            api_url = "https://api.search.brave.com/res/v1/web/search"
+
+            headers = {"Accept": "application/json", "Accept-Encoding": "gzip", "X-Subscription-Token": brave_api_key}
+
+            params = {
+                "q": query,
+                "count": min(count, 20),  # Limit to max 20 results
+                "search_lang": "en",
+                "country": "US",
+                "safesearch": "moderate",
+                "text_decorations": False,
+                "spellcheck": True,
+            }
+
+            response = requests.get(api_url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            search_data = response.json()
+
+            # Extract relevant information from search results
+            results = []
+            web_results = search_data.get("web", {}).get("results", [])
+
+            for result in web_results[:count]:
+                results.append(
+                    {
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "description": result.get("description", ""),
+                        "published": result.get("age", ""),
+                        "language": result.get("language", ""),
+                    }
+                )
+
+            # Include query information and metadata
+            query_info = search_data.get("query", {})
+
+            return {
+                "query": query,
+                "original_query": query_info.get("original", query),
+                "altered_query": query_info.get("altered"),
+                "spellcheck_off": query_info.get("spellcheck_off", False),
+                "results_count": len(results),
+                "results": results,
+                "search_metadata": {
+                    "total_results": search_data.get("web", {}).get("total", 0),
+                    "search_time": search_data.get("web", {}).get("search_time", 0),
+                },
+            }
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Brave Search API request failed: {e}")
+            return {"error": f"Failed to search web: {str(e)}"}
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Brave Search API response: {e}")
+            return {"error": "Failed to parse search results"}
+        except Exception as e:
+            logger.error(f"Web search tool error: {e}")
+            return {"error": f"Web search tool error: {str(e)}"}

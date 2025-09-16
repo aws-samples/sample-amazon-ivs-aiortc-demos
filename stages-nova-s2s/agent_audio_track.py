@@ -45,6 +45,7 @@ class AgentAudioTrack(AudioStreamTrack):
         self.last_stats_time = 0
         self.stats_interval = 5.0  # Print stats every 5 seconds
         self.peer_connection = None  # Will be set externally
+        self.avg_fps = 0
 
         # Performance tracking
         self.frames_sent = 0
@@ -52,12 +53,8 @@ class AgentAudioTrack(AudioStreamTrack):
         self.buffer_empty_count = 0
         self.start_time = time.time()
 
-        # Adaptive timing
+        # Fixed timing for consistent audio frame rate
         self.target_fps = 50.0  # Target 50 FPS (20ms chunks)
-        self.current_delay_empty = 0.010  # Start with 10ms for empty buffer
-        self.current_delay_normal = 0.020  # Start with 20ms for normal
-        self.last_fps_check = time.time()
-        self.fps_check_interval = 0.5  # Adjust every 500ms for more responsive tuning
 
         # Dynamic chunk sizing
         self.base_chunk_size_bytes = self.chunk_size_bytes  # Store original
@@ -84,6 +81,7 @@ class AgentAudioTrack(AudioStreamTrack):
             # Calculate performance metrics
             uptime = current_time - self.start_time
             avg_fps = self.frames_sent / uptime if uptime > 0 else 0
+            self.avg_fps = avg_fps
             avg_throughput = self.bytes_processed / uptime if uptime > 0 else 0
             buffer_empty_rate = self.buffer_empty_count / self.frames_sent if self.frames_sent > 0 else 0
 
@@ -142,42 +140,11 @@ class AgentAudioTrack(AudioStreamTrack):
             else:
                 logger.debug("⚠️  No peer connection available for stats")
 
-            # Adaptive timing adjustment
-            self._adjust_timing_based_on_fps(avg_fps)
+            # Note: Removed adaptive timing adjustment as it was causing performance issues
 
             # Adaptive chunk sizing based on network conditions
             # DISABLED: Causes audio jitter due to frequent chunk size changes
             # self._adjust_chunk_size_based_on_network()
-
-    def _adjust_timing_based_on_fps(self, current_fps):
-        """Adjust timing delays based on actual FPS performance"""
-        current_time = time.time()
-        if current_time - self.last_fps_check >= self.fps_check_interval:
-            self.last_fps_check = current_time
-
-            if current_fps > 0:  # Only adjust if we have meaningful data
-                fps_ratio = current_fps / self.target_fps
-
-                if fps_ratio < 0.8:  # Running too slow (< 40 FPS)
-                    # Reduce delays to speed up
-                    self.current_delay_empty *= 0.1
-                    self.current_delay_normal *= 0.1
-                    logger.debug(
-                        f"🐌 FPS too low ({current_fps:.1f}/{self.target_fps}), reducing delays to "
-                        f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
-                    )
-                elif fps_ratio > 1.2:  # Running too fast (> 60 FPS)
-                    # Increase delays to slow down
-                    self.current_delay_empty *= 0.8
-                    self.current_delay_normal *= 0.8
-                    logger.debug(
-                        f"🐰 FPS too high ({current_fps:.1f}/{self.target_fps}), increasing delays to "
-                        f"{self.current_delay_empty*1000:.1f}ms/{self.current_delay_normal*1000:.1f}ms"
-                    )
-
-                # Keep delays within reasonable bounds
-                self.current_delay_empty = max(0.001, min(0.050, self.current_delay_empty))
-                self.current_delay_normal = max(0.001, min(0.050, self.current_delay_normal))
 
     def _collect_network_sample(self, rtt, jitter):
         """Collect network performance samples for chunk size adaptation"""
@@ -300,16 +267,19 @@ class AgentAudioTrack(AudioStreamTrack):
             # Update frame count
             self.frame_count += len(audio_array)
 
-            # Adaptive timing based on performance
-            # this appears to not be necessary
-            # and in fact actually harms performance
-            # so it is commented out for now
-            if buffer_was_empty:
-                # await asyncio.sleep(self.current_delay_empty)
-                pass
-            else:
-                # await asyncio.sleep(self.current_delay_normal)
-                pass
+            # Fixed timing to maintain proper audio frame rate
+            # For 24kHz audio with 20ms chunks (480 samples), we should target 50 FPS
+            # Only sleep if we're running at or above target FPS to avoid slowing down low FPS streams
+            target_sleep = 0.020  # 20ms = 50 FPS
+
+            if self.avg_fps >= 50:
+                if buffer_was_empty:
+                    # When buffer is empty, we can sleep a bit longer to reduce CPU usage
+                    await asyncio.sleep(target_sleep)
+                else:
+                    # When we have audio data, maintain precise timing
+                    await asyncio.sleep(target_sleep)
+            # If FPS < 50, don't sleep - let it run as fast as possible to catch up
 
             return frame
 

@@ -36,6 +36,7 @@ class BedrockStreamManager:
         region="us-east-1",
         input_sample_rate=16000,
         weather_api_key=None,
+        brave_api_key=None,
         enable_frame_analysis=True,
         analysis_model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
         analysis_region="us-east-1",
@@ -70,6 +71,15 @@ class BedrockStreamManager:
             logger.warning("⚠️  `weather_api_key` not found. Weather tool will not be available.")
         else:
             logger.info("🌤️  Weather tool is available")
+
+        # Brave Search API configuration
+        self.brave_api_key = brave_api_key
+        self.web_search_tool_available = self.brave_api_key is not None
+
+        if not self.web_search_tool_available:
+            logger.warning("⚠️  `brave_api_key` not found. Web search tool will not be available.")
+        else:
+            logger.info("🔍 Web search tool is available")
 
         # Frame analysis configuration logging
         if self.enable_frame_analysis:
@@ -108,14 +118,17 @@ class BedrockStreamManager:
             {
                 "type": "object",
                 "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "Location name to get date/time for (e.g., 'New York', 'London', 'Tokyo').",
+                    },
                     "timezone": {
                         "type": "string",
-                        "description": "Time timezone at which to return the date/time. Default to local where script is running.",
-                        "enum": pytz.all_timezones,
-                        "default": tzlocal.get_localzone().key,
-                    }
+                        "description": "Timezone for the location (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo'). This is required to provide accurate time information.",
+                        "enum": list(pytz.all_timezones),
+                    },
                 },
-                "required": [],
+                "required": ["location", "timezone"],
             }
         )
 
@@ -142,12 +155,33 @@ class BedrockStreamManager:
             }
         )
 
+        # Web search tool schema
+        self.web_search_schema = json.dumps(
+            {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query to find information on the web. Use specific keywords and phrases for best results.",
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of search results to return (default: 5, maximum: 20)",
+                        "minimum": 1,
+                        "maximum": 20,
+                        "default": 5,
+                    },
+                },
+                "required": ["query"],
+            }
+        )
+
         # Build tools list dynamically based on availability
         tools_list = [
             {
                 "toolSpec": {
                     "name": "getDateAndTimeTool",
-                    "description": "Get information about the current date and time",
+                    "description": "Get information about the current date and time for a specific location. This tool requires both a location and timezone to provide accurate time information.",
                     "inputSchema": {"json": self.date_time_schema},
                 }
             },
@@ -173,6 +207,18 @@ class BedrockStreamManager:
                         "name": "getWeatherTool",
                         "description": "Get current weather information and 5-day forecast for a specified location",
                         "inputSchema": {"json": self.weather_schema},
+                    }
+                }
+            )
+
+        # Add web search tool if API key is available
+        if self.web_search_tool_available:
+            tools_list.append(
+                {
+                    "toolSpec": {
+                        "name": "webSearchTool",
+                        "description": "Search the web for current information, news, facts, or answers to questions. Use this when you need up-to-date information that might not be in your training data, or when the user asks about recent events, current prices, latest news, or specific factual information.",
+                        "inputSchema": {"json": self.web_search_schema},
                     }
                 }
             )
@@ -307,10 +353,17 @@ class BedrockStreamManager:
             self.is_active = True
 
             system_prompt = (
-                "You are a friendly assistant named Tiffany that is participating in a live video call."
-                "Keep your responses very brief and conversational, like a natural spoken dialog."
-                "Do not use gendered pronouns like he or she - even when using tools."
-                "If and when you analyze frames of a video, refer to a single person as 'you' and say things like 'your' or 'you are'. If multiple people are recognized, refer to them as 'they' or 'them'"
+                "You are a friendly assistant named Tiffany that is participating in a live video call. "
+                "Keep your responses very brief and conversational, like a natural spoken dialog. "
+                "Do not use gendered pronouns like he or she - even when using tools. "
+                "If and when you analyze frames of a video, refer to a single person as 'you' and say things like 'your' or 'you are'. If multiple people are recognized, refer to them as 'they' or 'them'. "
+                "You have access to several tools: date/time information for any location, weather forecasts, video frame analysis"
+                + (", and web search capabilities to find current information, news, and facts" if self.web_search_tool_available else "")
+                + ". "
+                "Avoid mentioning specific website URLs, as this does not provide a good user experience for a voice agent."
+                "Use these tools when appropriate to provide helpful and accurate information. "
+                "For date/time requests, you must ask the user to specify both their location and timezone if not provided, as both are required for accurate time information. "
+                "For web searches, use specific keywords to find the most relevant and current information. "
                 "Respond in 1-2 sentences maximum."
             )
 
@@ -570,11 +623,12 @@ class BedrockStreamManager:
 
         tool = tool_name.lower()
         if tool == "getdateandtimetool":
-            # Get current date and time
+            # Get current date and time for location
             content = tool_content.get("content", {})
             content_data = json.loads(content)
-            tz = content_data.get("timezone", "")
-            return self.agent_tools.getdateandtime(tz)
+            location = content_data.get("location", "")
+            tz = content_data.get("timezone", None)
+            return self.agent_tools.getdateandtime(location, tz)
         elif tool == "getweathertool":
             # Get weather information with forecast
             if not self.weather_tool_available:
@@ -617,6 +671,35 @@ class BedrockStreamManager:
 
                 traceback.print_exc()
                 return {"error": f"Frame analysis failed: {str(e)}"}
+        elif tool == "websearchtool":
+            # Web search tool
+            if not self.web_search_tool_available:
+                logger.warning("Web search tool called but Brave API key not available")
+                return {"error": "Web search is not available - Brave API key not configured"}
+
+            content = tool_content.get("content", {})
+            content_data = json.loads(content)
+            query = content_data.get("query", "")
+            count = content_data.get("count", 5)
+
+            logger.info(f"🔍 Starting web search for: {query}")
+
+            try:
+                search_results = self.agent_tools.websearch(query, self.brave_api_key, count)
+
+                if search_results is None:
+                    logger.warning("Web search returned None")
+                    return {"error": "Web search failed - no results returned"}
+
+                logger.info("🔍 Web search completed successfully")
+                return search_results
+
+            except Exception as e:
+                logger.error(f"Web search error: {e}")
+                import traceback
+
+                traceback.print_exc()
+                return {"error": f"Web search failed: {str(e)}"}
         else:
             return {"error": f"Unsupported tool: {tool_name}"}
 

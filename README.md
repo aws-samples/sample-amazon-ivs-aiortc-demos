@@ -166,6 +166,9 @@ export AWS_SECRET_ACCESS_KEY=your_secret_key
 
 # Optional: For weather functionality in Nova speech-to-speech
 export WEATHER_API_KEY=your_weather_api_key
+
+# Optional: For web search functionality in Nova speech-to-speech
+export BRAVE_API_KEY=your_brave_api_key
 ```
 
 ### Weather API (Optional)
@@ -176,6 +179,15 @@ The Nova speech-to-speech script supports weather queries through WeatherAPI.com
 2. Get your API key from the dashboard
 3. Set the `WEATHER_API_KEY` environment variable
 4. The AI assistant will then be able to answer weather-related questions
+
+### Web Search API (Optional)
+
+The Nova speech-to-speech script supports web search capabilities through Brave Search API:
+
+1. Sign up at [Brave Search API](https://api.search.brave.com/) for a free account
+2. Get your API key from the dashboard
+3. Set the `BRAVE_API_KEY` environment variable or use the `--brave-api-key` command line argument
+4. The AI assistant will then be able to search the web for current information, news, and facts
 
 ## Sub-Projects
 
@@ -501,6 +513,8 @@ python ivs-stage-nova-s2s.py \
 -   `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
 -   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
 -   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+-   `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
+-   `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
 -   `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
 
 **Key Components:**
@@ -514,8 +528,9 @@ python ivs-stage-nova-s2s.py \
 
 **Available Tools:**
 
--   **Date/Time Tool**: Get current date and time information with timezone support
+-   **Date/Time Tool**: Get current date and time information for specific locations with timezone support
 -   **Weather Tool**: Get current weather and 5-day forecast (requires `WEATHER_API_KEY`)
+-   **Web Search Tool**: Search the web for current information, news, and facts (requires `BRAVE_API_KEY`)
 -   **Frame Analysis Tool**: Analyze video frames for visual assistance and content description
 
 #### Assistant Management
