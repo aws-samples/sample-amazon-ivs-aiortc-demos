@@ -360,9 +360,17 @@ class BedrockStreamManager:
                 "You have access to several tools: date/time information for any location, weather forecasts, video frame analysis"
                 + (", and web search capabilities to find current information, news, and facts" if self.web_search_tool_available else "")
                 + ". "
+                "You can analyze the user's video to answer questions when they ask specific questions of you."
+                "For example, if the user's prompt says 'Tell me what you see...', or 'Take a look at this...',"
+                "or 'Do you see...', or otherwise implies that they want you to visually analyze something, "
+                "you should use the analyzeFrameTool that is available to you. DO NOT FORGET THIS TOOL."
+                "I understand that you don't have vision capabilities by default, and can't 'see' things"
+                "like a human can, but the analyzeFrameTool gives you the ability to analyze a video frame"
+                "and will provide you the information that you need to answer the user's prompt."
                 "Avoid mentioning specific website URLs, as this does not provide a good user experience for a voice agent."
                 "Use these tools when appropriate to provide helpful and accurate information. "
-                "For date/time requests, you must ask the user to specify both their location and timezone if not provided, as both are required for accurate time information. "
+                "For date/time requests, prompt the user for their location and infer or use a tool to determine"
+                "the correct timezone if not provided by the user's prompt, as both are required for accurate time information. "
                 "For web searches, use specific keywords to find the most relevant and current information. "
                 "Respond in 1-2 sentences maximum."
             )
