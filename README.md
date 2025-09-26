@@ -73,8 +73,8 @@ amazon-ivs-python-demos/
 │   └── ivs-stage-subscribe-analyze-video.py           # Subscribe with AI video analysis
 ├── stages-nova-s2s/                                    # AI Speech-to-Speech
 │   └── ivs-stage-nova-s2s.py                          # Nova Sonic integration
-├── stages-open-ai/                                    # OpenAI Real-time API
-│   └── ivs-stage-openai-realtime.py                   # OpenAI real-time integration
+├── stages-gpt-realtime/                                    # GPT RealTime API
+│   └── ivs-stage-gpt-realtime.py                       # gpt-realtime integration
 └── stages_sei/                                         # SEI Publishing System
     ├── SEI.md                                          # SEI documentation and usage guide
     ├── sei_publisher.py                                # High-level SEI message publishing
@@ -548,17 +548,17 @@ This companion tool allows you to dynamically launch and manage multiple Nova S2
 
 For automated management of multiple OpenAI assistant instances via WebSocket integration with IVS Chat, see:
 
-**[IVS Stage OpenAI Assistant Manager Documentation](stages-open-ai/MANAGING_OPENAI_ASSISTANT_DEMO.md)**
+**[IVS Stage OpenAI Assistant Manager Documentation](stages-gpt-realtime/MANAGING_OPENAI_ASSISTANT_DEMO.md)**
 
 This companion tool allows you to dynamically launch and manage multiple OpenAI real-time instances based on chat messages, with full control over voice, VAD settings, and vision capabilities.
 
 ### Stages OpenAI Real-time API
 
-The `stages-open-ai/` directory contains integration with OpenAI's real-time API for speech-to-speech conversations with IVS Real-Time Stages.
+The `stages-gpt-realtime/` directory contains integration with OpenAI's real-time API for speech-to-speech conversations with IVS Real-Time Stages.
 
-#### ivs-stage-openai-realtime.py
+#### ivs-stage-gpt-realtime.py
 
-A comprehensive script that integrates OpenAI's real-time API with IVS Real-Time Stages for conversational AI experiences.
+A comprehensive script that integrates OpenAI's gpt-realtime API with IVS Real-Time Stages for conversational AI experiences.
 
 **Features:**
 
@@ -574,7 +574,7 @@ A comprehensive script that integrates OpenAI's real-time API with IVS Real-Time
 **Usage:**
 
 ```bash
-cd stages-open-ai
+cd stages-gpt-realtime
 python ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
@@ -635,19 +635,19 @@ export OPENAI_API_KEY="sk-your-openai-api-key-here"
 
 ```bash
 # Basic OpenAI conversation
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123"
 
 # Using different voice and model
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --voice "nova" \
   --model "gpt-4o-realtime-preview-2024-10-01"
 
 # With explicit API key
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --openai-key "sk-..."
@@ -852,36 +852,36 @@ python stages-nova-s2s/ivs-stage-nova-s2s.py \
 
 ```bash
 # Basic OpenAI real-time conversation
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtimeltime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123"
 
 # Using different voice
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --voice "nova"
 
 # With explicit OpenAI API key
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --openai-key "sk-your-key-here"
 
 # With vision capabilities disabled
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --disable-frame-analysis
 
 # With custom Bedrock model for vision
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtimeltime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --bedrock-model-id "anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 # Fast connection setup
-python stages-open-ai/ivs-stage-openai-realtime.py \
+python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --ice-timeout 1
