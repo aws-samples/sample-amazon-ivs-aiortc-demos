@@ -6,23 +6,24 @@ A comprehensive collection of Python demo scripts demonstrating various Amazon I
 
 ## Table of Contents
 
--   [Overview](#overview)
--   [Project Structure](#project-structure)
--   [Prerequisites](#prerequisites)
--   [Installation](#installation)
--   [Configuration](#configuration)
--   [Sub-Projects](#sub-projects)
-    -   [Channels Subscribe](#channels-subscribe)
-    -   [Stages Publish](#stages-publish)
-    -   [Stages Subscribe](#stages-subscribe)
-    -   [Stages Nova Speech-to-Speech](#stages-nova-speech-to-speech)
-    -   [Stages SEI Publishing](#stages-sei-publishing)
--   [Usage Examples](#usage-examples)
--   [Troubleshooting](#troubleshooting)
--   [Dependencies](#dependencies)
--   [Contributing](#contributing)
--   [License](#license)
--   [Support](#support)
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Sub-Projects](#sub-projects)
+  - [Channels Subscribe](#channels-subscribe)
+  - [Stages Publish](#stages-publish)
+  - [Stages Subscribe](#stages-subscribe)
+  - [Stages Nova Speech-to-Speech](#stages-nova-speech-to-speech)
+  - [Stages OpenAI Real-time API](#stages-openai-real-time-api)
+  - [Stages SEI Publishing](#stages-sei-publishing)
+- [Usage Examples](#usage-examples)
+- [Troubleshooting](#troubleshooting)
+- [Dependencies](#dependencies)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
 
 ## Overview
 
@@ -30,21 +31,21 @@ This project demonstrates how to integrate Amazon IVS services with various AI a
 
 ### IVS Real-Time Stages (WebRTC)
 
--   **WebRTC Publishing**: Stream video/audio content to IVS stages
--   **WebRTC Subscribing**: Receive and process streams from IVS stages
--   **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
--   **SEI Publishing**: Embed metadata directly into H.264 video streams using SEI NAL units
--   **Event Handling**: Process real-time stage events via WebSocket connections
--   **Audio Visualization**: Generate dynamic audio visualizations
+- **WebRTC Publishing**: Stream video/audio content to IVS stages
+- **WebRTC Subscribing**: Receive and process streams from IVS stages
+- **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
+- **SEI Publishing**: Embed metadata directly into H.264 video streams using SEI NAL units
+- **Event Handling**: Process real-time stage events via WebSocket connections
+- **Audio Visualization**: Generate dynamic audio visualizations
 
 ### IVS Channels (Low-Latency HLS)
 
--   **Channel Subscription**: Subscribe to and analyze IVS channel streams
--   **Frame Analysis**: AI-powered video frame analysis using Amazon Bedrock Claude
--   **Video Analysis**: Comprehensive video segment analysis using TwelveLabs Pegasus
--   **Real-time Transcription**: Convert speech to text using OpenAI Whisper
--   **Timed Metadata Publishing**: Publish analysis results back to IVS as timed metadata
--   **Rendition Selection**: Automatic or manual selection of stream quality
+- **Channel Subscription**: Subscribe to and analyze IVS channel streams
+- **Frame Analysis**: AI-powered video frame analysis using Amazon Bedrock Claude
+- **Video Analysis**: Comprehensive video segment analysis using TwelveLabs Pegasus
+- **Real-time Transcription**: Convert speech to text using OpenAI Whisper
+- **Timed Metadata Publishing**: Publish analysis results back to IVS as timed metadata
+- **Rendition Selection**: Automatic or manual selection of stream quality
 
 > [!IMPORTANT]
 > Using these demos with your AWS account will create and consume AWS resources, which will cost money.
@@ -72,6 +73,8 @@ amazon-ivs-python-demos/
 │   └── ivs-stage-subscribe-analyze-video.py           # Subscribe with AI video analysis
 ├── stages-nova-s2s/                                    # AI Speech-to-Speech
 │   └── ivs-stage-nova-s2s.py                          # Nova Sonic integration
+├── stages-open-ai/                                    # OpenAI Real-time API
+│   └── ivs-stage-openai-realtime.py                   # OpenAI real-time integration
 └── stages_sei/                                         # SEI Publishing System
     ├── SEI.md                                          # SEI documentation and usage guide
     ├── sei_publisher.py                                # High-level SEI message publishing
@@ -80,11 +83,11 @@ amazon-ivs-python-demos/
 
 ## Prerequisites
 
--   Python 3.8 or higher
--   AWS CLI configured with appropriate credentials
--   Amazon IVS Real-Time Stage ARN and participant tokens
--   FFmpeg (for media processing when using transcription demo - not necessary otherwise)
--   Audio input/output devices (for speech-to-speech functionality)
+- Python 3.8 or higher
+- AWS CLI configured with appropriate credentials
+- Amazon IVS Real-Time Stage ARN and participant tokens
+- FFmpeg (for media processing when using transcription demo - not necessary otherwise)
+- Audio input/output devices (for speech-to-speech functionality)
 
 ### AWS Permissions Required
 
@@ -92,66 +95,66 @@ Your AWS credentials need the following permissions:
 
 **For IVS Real-Time Stages:**
 
--   `ivs:CreateParticipantToken`
--   `bedrock:InvokeModel` (for video frame analysis with Claude)
--   `bedrock:InvokeModelWithBidirectionalStream` (for Nova Sonic)
--   Access to Amazon IVS Real-Time Stages
+- `ivs:CreateParticipantToken`
+- `bedrock:InvokeModel` (for video frame analysis with Claude)
+- `bedrock:InvokeModelWithBidirectionalStream` (for Nova Sonic)
+- Access to Amazon IVS Real-Time Stages
 
 **For IVS Channels:**
 
--   `ivs:PutMetadata` (for publishing timed metadata)
--   `bedrock:InvokeModel` (for Claude frame analysis and TwelveLabs Pegasus video analysis)
--   Access to Amazon IVS Channels
+- `ivs:PutMetadata` (for publishing timed metadata)
+- `bedrock:InvokeModel` (for Claude frame analysis and TwelveLabs Pegasus video analysis)
+- Access to Amazon IVS Channels
 
 ## Installation
 
 1. **Clone and navigate to the project directory:**
 
-    ```bash
-    cd /amazon-ivs-aiortc-demos
-    ```
+   ```bash
+   cd /amazon-ivs-aiortc-demos
+   ```
 
 2. **Create and activate a virtual environment:**
 
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate  # On macOS/Linux
-    # or
-    .venv\Scripts\activate     # On Windows
-    ```
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate  # On macOS/Linux
+   # or
+   .venv\Scripts\activate     # On Windows
+   ```
 
 3. **Install dependencies:**
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 4. **Install system dependencies:**
 
-    **macOS:**
+   **macOS:**
 
-    ```bash
-    brew install ffmpeg portaudio
-    ```
+   ```bash
+   brew install ffmpeg portaudio
+   ```
 
-    **Ubuntu/Debian:**
+   **Ubuntu/Debian:**
 
-    ```bash
-    sudo apt-get update
-    sudo apt-get install ffmpeg portaudio19-dev
-    ```
+   ```bash
+   sudo apt-get update
+   sudo apt-get install ffmpeg portaudio19-dev
+   ```
 
-    **Windows:**
+   **Windows:**
 
-    ```bash
-    # Install FFmpeg
-    # Download from https://ffmpeg.org/download.html and add to PATH
-    # Or use chocolatey:
-    choco install ffmpeg
+   ```bash
+   # Install FFmpeg
+   # Download from https://ffmpeg.org/download.html and add to PATH
+   # Or use chocolatey:
+   choco install ffmpeg
 
-    # PortAudio is typically installed automatically with pyaudio
-    # If you encounter issues, you may need to install Microsoft Visual C++ Build Tools
-    ```
+   # PortAudio is typically installed automatically with pyaudio
+   # If you encounter issues, you may need to install Microsoft Visual C++ Build Tools
+   ```
 
 ## Configuration
 
@@ -197,47 +200,47 @@ The `channels-subscribe/` directory contains scripts for subscribing to and anal
 
 #### Key Features
 
--   **Frame Analysis**: Analyze individual video frames using Amazon Bedrock Claude models
--   **Video Analysis**: Process video segments using TwelveLabs Pegasus for comprehensive content analysis
--   **Audio/Video Analysis**: Combined audio and video processing with proper synchronization using PyAV
--   **Real-Time Transcription**: Live speech-to-text using OpenAI Whisper with multi-language support
--   **Timed Metadata Publishing**: Publish analysis results back to IVS channels as timed metadata
--   **Rendition Selection**: Automatic or manual selection of stream quality
+- **Frame Analysis**: Analyze individual video frames using Amazon Bedrock Claude models
+- **Video Analysis**: Process video segments using TwelveLabs Pegasus for comprehensive content analysis
+- **Audio/Video Analysis**: Combined audio and video processing with proper synchronization using PyAV
+- **Real-Time Transcription**: Live speech-to-text using OpenAI Whisper with multi-language support
+- **Timed Metadata Publishing**: Publish analysis results back to IVS channels as timed metadata
+- **Rendition Selection**: Automatic or manual selection of stream quality
 
 #### Scripts Overview
 
 **ivs-channel-subscribe-analyze-frames.py**
 
--   Analyzes individual video frames at configurable intervals using Amazon Bedrock Claude
--   Supports multiple Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
--   Configurable analysis intervals for cost control
--   Optional video display and rendition quality selection
+- Analyzes individual video frames at configurable intervals using Amazon Bedrock Claude
+- Supports multiple Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
+- Configurable analysis intervals for cost control
+- Optional video display and rendition quality selection
 
 **ivs-channel-subscribe-analyze-video.py**
 
--   Records and analyzes video segments using TwelveLabs Pegasus
--   Encodes video chunks to MP4 for comprehensive analysis
--   OpenCV-based video capture with configurable recording duration
+- Records and analyzes video segments using TwelveLabs Pegasus
+- Encodes video chunks to MP4 for comprehensive analysis
+- OpenCV-based video capture with configurable recording duration
 
 **ivs-channel-subscribe-analyze-audio-video.py**
 
--   Advanced script using PyAV for proper audio/video stream handling
--   Native audio capture and encoding with H.264 video and AAC audio
--   Complete media analysis with TwelveLabs Pegasus
+- Advanced script using PyAV for proper audio/video stream handling
+- Native audio capture and encoding with H.264 video and AAC audio
+- Complete media analysis with TwelveLabs Pegasus
 
 **ivs-channel-subscribe-transcribe.py**
 
--   Real-time audio transcription using OpenAI Whisper
--   Support for 99+ languages with auto-detection
--   Multiple Whisper models from tiny to large-v3
--   Optional publishing of transcripts as IVS timed metadata
+- Real-time audio transcription using OpenAI Whisper
+- Support for 99+ languages with auto-detection
+- Multiple Whisper models from tiny to large-v3
+- Optional publishing of transcripts as IVS timed metadata
 
 **ivs_metadata_publisher.py**
 
--   Reusable module for publishing timed metadata to IVS channels
--   Automatic channel ARN extraction from M3U8 playlist URLs
--   Rate limiting compliance and automatic payload splitting
--   Support for transcripts, events, and custom metadata
+- Reusable module for publishing timed metadata to IVS channels
+- Automatic channel ARN extraction from M3U8 playlist URLs
+- Rate limiting compliance and automatic payload splitting
+- Support for transcripts, events, and custom metadata
 
 #### Usage Examples
 
@@ -273,10 +276,10 @@ Basic media publishing script that streams video/audio content to an IVS stage.
 
 **Features:**
 
--   Publishes video and audio tracks from MP4 files to IVS Real-Time Stages
--   JWT token validation and capability checking
--   WebRTC connection management
--   Option to publish video-only streams
+- Publishes video and audio tracks from MP4 files to IVS Real-Time Stages
+- JWT token validation and capability checking
+- WebRTC connection management
+- Option to publish video-only streams
 
 **Usage:**
 
@@ -289,9 +292,9 @@ python ivs-stage-publish.py \
 
 **Command-line Arguments:**
 
--   `--token`: JWT participant token with publish capabilities (required)
--   `--path-to-mp4`: Path to MP4 file to publish (required)
--   `--video-only`: Publish video only, no audio (optional flag)
+- `--token`: JWT participant token with publish capabilities (required)
+- `--path-to-mp4`: Path to MP4 file to publish (required)
+- `--video-only`: Publish video only, no audio (optional flag)
 
 #### ivs-stage-publish-events.py
 
@@ -299,10 +302,10 @@ Enhanced publishing script with real-time event handling via WebSocket connectio
 
 **Features:**
 
--   All features of basic publisher
--   Real-time stage event monitoring via WebSocket
--   Participant join/leave notifications
--   Stage state change handling
+- All features of basic publisher
+- Real-time stage event monitoring via WebSocket
+- Participant join/leave notifications
+- Stage state change handling
 
 **Usage:**
 
@@ -315,9 +318,9 @@ python ivs-stage-publish-events.py \
 
 **Command-line Arguments:**
 
--   `--token`: JWT participant token with publish capabilities (required)
--   `--path-to-mp4`: Path to MP4 file to publish (required)
--   `--video-only`: Publish video only, no audio (optional flag)
+- `--token`: JWT participant token with publish capabilities (required)
+- `--path-to-mp4`: Path to MP4 file to publish (required)
+- `--video-only`: Publish video only, no audio (optional flag)
 
 #### ivs-stage-pub-sub.py
 
@@ -325,10 +328,10 @@ Advanced script that demonstrates simultaneous publishing and subscribing capabi
 
 **Features:**
 
--   Publishes audio from MP4 file while subscribing to other participants
--   Demonstrates bidirectional communication
--   Audio/video track management
--   SDP (Session Description Protocol) handling
+- Publishes audio from MP4 file while subscribing to other participants
+- Demonstrates bidirectional communication
+- Audio/video track management
+- SDP (Session Description Protocol) handling
 
 **Usage:**
 
@@ -341,10 +344,10 @@ python ivs-stage-pub-sub.py \
 
 **Command-line Arguments:**
 
--   `--token`: JWT participant token with both publish and subscribe capabilities (required)
--   `--path-to-mp4`: Path to MP4 file to publish audio from (required)
--   `--video-only`: Publish video only, no audio (optional flag)
--   `--subscribe-to`: List of participant IDs to subscribe to (optional)
+- `--token`: JWT participant token with both publish and subscribe capabilities (required)
+- `--path-to-mp4`: Path to MP4 file to publish audio from (required)
+- `--video-only`: Publish video only, no audio (optional flag)
+- `--subscribe-to`: List of participant IDs to subscribe to (optional)
 
 ### Stages Subscribe
 
@@ -356,11 +359,11 @@ Subscribes to IVS stage audio streams and provides real-time speech-to-text tran
 
 **Features:**
 
--   Subscribes to audio tracks from specific participants in IVS Real-Time Stages
--   Real-time speech transcription using Whisper
--   Audio chunk processing and buffering
--   Multiple language support
--   Audio format conversion and normalization
+- Subscribes to audio tracks from specific participants in IVS Real-Time Stages
+- Real-time speech transcription using Whisper
+- Audio chunk processing and buffering
+- Multiple language support
+- Audio format conversion and normalization
 
 **Usage:**
 
@@ -373,22 +376,22 @@ python ivs-stage-subscribe-transcribe.py \
 
 **Command-line Arguments:**
 
--   `--participant-id`: ID of the participant to subscribe to (required)
--   `--token`: JWT participant token with subscribe capabilities (required)
--   `--whisper-model`: Whisper model size - "tiny", "base", "small", "medium", "large" (default: "tiny")
--   `--fp16`: Enable FP16 precision for faster processing (default: true)
--   `--language`: Language code for transcription (default: "en")
--   `--chunk-duration`: Audio chunk duration in seconds (default: 5)
+- `--participant-id`: ID of the participant to subscribe to (required)
+- `--token`: JWT participant token with subscribe capabilities (required)
+- `--whisper-model`: Whisper model size - "tiny", "base", "small", "medium", "large" (default: "tiny")
+- `--fp16`: Enable FP16 precision for faster processing (default: true)
+- `--language`: Language code for transcription (default: "en")
+- `--chunk-duration`: Audio chunk duration in seconds (default: 5)
 
 **Supported Languages:**
 
--   English ("en")
--   Spanish ("es")
--   French ("fr")
--   German ("de")
--   Italian ("it")
--   Portuguese ("pt")
--   And many more supported by Whisper
+- English ("en")
+- Spanish ("es")
+- French ("fr")
+- German ("de")
+- Italian ("it")
+- Portuguese ("pt")
+- And many more supported by Whisper
 
 #### ivs-stage-subscribe-analyze-frames.py
 
@@ -396,13 +399,13 @@ Subscribes to IVS stage video streams and provides AI-powered video frame analys
 
 **Features:**
 
--   Subscribes to video tracks from specific participants in IVS Real-Time Stages
--   AI-powered video frame analysis using Claude Sonnet 4
--   Configurable analysis intervals to control costs
--   Support for multiple Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
--   Detailed frame descriptions for content moderation and accessibility
--   Background processing to avoid blocking video streams
--   Cost-conscious design with smart frame sampling
+- Subscribes to video tracks from specific participants in IVS Real-Time Stages
+- AI-powered video frame analysis using Claude Sonnet 4
+- Configurable analysis intervals to control costs
+- Support for multiple Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
+- Detailed frame descriptions for content moderation and accessibility
+- Background processing to avoid blocking video streams
+- Cost-conscious design with smart frame sampling
 
 **Usage:**
 
@@ -415,33 +418,33 @@ python ivs-stage-subscribe-analyze-frames.py \
 
 **Command-line Arguments:**
 
--   `--token`: JWT participant token with subscribe capabilities (required)
--   `--subscribe-to`: Participant ID to subscribe to (required)
--   `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
--   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
--   `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
--   `--disable-analysis`: Disable video frame analysis, just subscribe to video (optional flag)
+- `--token`: JWT participant token with subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
+- `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+- `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--disable-analysis`: Disable video frame analysis, just subscribe to video (optional flag)
 
 **Supported Models:**
 
--   **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-20250514-v1:0` - Most capable, best for complex analysis
--   **Claude 3.5 Sonnet**: `anthropic.claude-3-5-sonnet-20241022-v2:0` - Very capable, good balance of performance and cost
--   **Claude 3.5 Haiku**: `anthropic.claude-3-5-haiku-20241022-v1:0` - Fastest and cheapest, good for basic content moderation
+- **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-20250514-v1:0` - Most capable, best for complex analysis
+- **Claude 3.5 Sonnet**: `anthropic.claude-3-5-sonnet-20241022-v2:0` - Very capable, good balance of performance and cost
+- **Claude 3.5 Haiku**: `anthropic.claude-3-5-haiku-20241022-v1:0` - Fastest and cheapest, good for basic content moderation
 
 **Use Cases:**
 
--   **Content Moderation**: Automatically detect inappropriate content in live streams
--   **Content Discovery**: Generate descriptions and tags for video content
--   **Accessibility**: Create detailed descriptions for visually impaired users
--   **Analytics**: Track objects, activities, and engagement in video streams
--   **Compliance**: Monitor streams for regulatory compliance
+- **Content Moderation**: Automatically detect inappropriate content in live streams
+- **Content Discovery**: Generate descriptions and tags for video content
+- **Accessibility**: Create detailed descriptions for visually impaired users
+- **Analytics**: Track objects, activities, and engagement in video streams
+- **Compliance**: Monitor streams for regulatory compliance
 
 **Cost Control Features:**
 
--   Configurable analysis intervals (default 30 seconds to minimize costs)
--   Background processing doesn't block video streaming
--   Option to disable analysis entirely for testing
--   Smart error handling prevents failed analyses from crashing streams
+- Configurable analysis intervals (default 30 seconds to minimize costs)
+- Background processing doesn't block video streaming
+- Option to disable analysis entirely for testing
+- Smart error handling prevents failed analyses from crashing streams
 
 #### ivs-stage-subscribe-analyze-video.py
 
@@ -449,13 +452,13 @@ Subscribes to IVS stage audio and video streams and provides AI-powered video an
 
 **Features:**
 
--   Subscribes to both audio and video tracks from specific participants
--   Records short video clips (configurable duration) for analysis
--   Encodes audio and video to MP4 format in memory
--   AI-powered video analysis using TwelveLabs Pegasus model
--   Detailed video content descriptions including people, objects, activities, and text
--   Asynchronous processing to maintain stream performance
--   Configurable analysis duration and frequency
+- Subscribes to both audio and video tracks from specific participants
+- Records short video clips (configurable duration) for analysis
+- Encodes audio and video to MP4 format in memory
+- AI-powered video analysis using TwelveLabs Pegasus model
+- Detailed video content descriptions including people, objects, activities, and text
+- Asynchronous processing to maintain stream performance
+- Configurable analysis duration and frequency
 
 **Usage:**
 
@@ -468,12 +471,12 @@ python ivs-stage-subscribe-analyze-video.py \
 
 **Command-line Arguments:**
 
--   `--token`: JWT participant token with subscribe capabilities (required)
--   `--subscribe-to`: Participant ID to subscribe to (required)
--   `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
--   `--bedrock-region`: AWS region for Bedrock service (default: "us-west-2")
--   `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.twelvelabs.pegasus-1-2-v1:0")
--   `--disable-analysis`: Disable video analysis, just subscribe to video (optional flag)
+- `--token`: JWT participant token with subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
+- `--bedrock-region`: AWS region for Bedrock service (default: "us-west-2")
+- `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.twelvelabs.pegasus-1-2-v1:0")
+- `--disable-analysis`: Disable video analysis, just subscribe to video (optional flag)
 
 ### Stages Nova Speech-to-Speech
 
@@ -485,15 +488,15 @@ A comprehensive script that combines IVS Real-Time Stages with Amazon Nova Sonic
 
 **Features:**
 
--   Bidirectional audio streaming with IVS participants
--   Amazon Nova Sonic integration for AI responses
--   Real-time waveform visualization
--   Audio resampling and format conversion
--   WebRTC track management for both publishing and subscribing
--   Dynamic audio visualization with gradient colormaps
--   AI-powered video frame analysis using Amazon Bedrock Claude models
--   Built-in tools for date/time, weather, and visual analysis
--   Configurable frame analysis with multiple Claude model options
+- Bidirectional audio streaming with IVS participants
+- Amazon Nova Sonic integration for AI responses
+- Real-time waveform visualization
+- Audio resampling and format conversion
+- WebRTC track management for both publishing and subscribing
+- Dynamic audio visualization with gradient colormaps
+- AI-powered video frame analysis using Amazon Bedrock Claude models
+- Built-in tools for date/time, weather, and visual analysis
+- Configurable frame analysis with multiple Claude model options
 
 **Usage:**
 
@@ -506,16 +509,16 @@ python ivs-stage-nova-s2s.py \
 
 **Command-line Arguments:**
 
--   `--token`: JWT participant token with both publish and subscribe capabilities (required)
--   `--subscribe-to`: Participant ID to subscribe to (required)
--   `--nova-model-id`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
--   `--nova-region`: AWS region for Nova service (default: "us-east-1")
--   `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
--   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
--   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
--   `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
--   `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
--   `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
+- `--token`: JWT participant token with both publish and subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--nova-model-id`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
+- `--nova-region`: AWS region for Nova service (default: "us-east-1")
+- `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
+- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+- `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
+- `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
+- `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
 
 **Key Components:**
 
@@ -528,10 +531,10 @@ python ivs-stage-nova-s2s.py \
 
 **Available Tools:**
 
--   **Date/Time Tool**: Get current date and time information for specific locations with timezone support
--   **Weather Tool**: Get current weather and 5-day forecast (requires `WEATHER_API_KEY`)
--   **Web Search Tool**: Search the web for current information, news, and facts (requires `BRAVE_API_KEY`)
--   **Frame Analysis Tool**: Analyze video frames for visual assistance and content description
+- **Date/Time Tool**: Get current date and time information for specific locations with timezone support
+- **Weather Tool**: Get current weather and 5-day forecast (requires `WEATHER_API_KEY`)
+- **Web Search Tool**: Search the web for current information, news, and facts (requires `BRAVE_API_KEY`)
+- **Frame Analysis Tool**: Analyze video frames for visual assistance and content description
 
 #### Assistant Management
 
@@ -540,6 +543,115 @@ For automated management of multiple Nova assistant instances via WebSocket inte
 **[IVS Stage Assistant Manager Documentation](stages-nova-s2s/MANAGING_ASSISTANT_DEMO.md)**
 
 This companion tool allows you to dynamically launch and manage multiple Nova S2S instances based on chat messages, perfect for scaling AI assistants across multiple participants.
+
+#### OpenAI Assistant Management
+
+For automated management of multiple OpenAI assistant instances via WebSocket integration with IVS Chat, see:
+
+**[IVS Stage OpenAI Assistant Manager Documentation](stages-open-ai/MANAGING_OPENAI_ASSISTANT_DEMO.md)**
+
+This companion tool allows you to dynamically launch and manage multiple OpenAI real-time instances based on chat messages, with full control over voice, VAD settings, and vision capabilities.
+
+### Stages OpenAI Real-time API
+
+The `stages-open-ai/` directory contains integration with OpenAI's real-time API for speech-to-speech conversations with IVS Real-Time Stages.
+
+#### ivs-stage-openai-realtime.py
+
+A comprehensive script that integrates OpenAI's real-time API with IVS Real-Time Stages for conversational AI experiences.
+
+**Features:**
+
+- Bidirectional audio streaming with IVS participants
+- OpenAI real-time API integration for AI responses
+- WebSocket-based real-time communication with OpenAI
+- Real-time audio visualization
+- Audio resampling and format conversion (24kHz for OpenAI)
+- WebRTC track management for both publishing and subscribing
+- Voice activity detection and interruption handling
+- Multiple voice options (alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar)
+
+**Usage:**
+
+```bash
+cd stages-open-ai
+python ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --openai-key "sk-..."
+```
+
+**Command-line Arguments:**
+
+- `--token`: JWT participant token with both publish and subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--openai-key`: OpenAI API key (optional, uses OPENAI_API_KEY environment variable if not provided)
+- `--model`: OpenAI model to use (default: "gpt-realtime")
+- `--voice`: Voice to use for responses - "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar" (default: "cedar")
+- `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
+- `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5)
+
+**Key Components:**
+
+1. **OpenAIAudioTrack**: Custom audio track for streaming OpenAI responses
+2. **OpenAIVideoTrack**: Dynamic audio visualization with OpenAI branding
+3. **OpenAIRealtimeManager**: Manages bidirectional OpenAI real-time API streaming
+4. **Audio Processing**: Handles resampling for OpenAI's 24kHz requirement
+5. **WebSocket Management**: Handles OpenAI real-time API WebSocket connection
+6. **Vision Capabilities**: AI-powered video frame analysis using Amazon Bedrock Claude models
+
+**Available Voices:**
+
+- **cedar** (default): Warm and conversational
+- **alloy**: Balanced and natural
+- **ash**: Clear and articulate
+- **ballad**: Smooth and melodic
+- **coral**: Bright and engaging
+- **echo**: Clear and articulate
+- **sage**: Wise and thoughtful
+- **shimmer**: Soft and gentle
+- **verse**: Expressive and dynamic
+- **marin**: Professional and polished
+
+**Prerequisites:**
+
+- OpenAI API key with real-time API access
+- IVS stage token with both publish and subscribe capabilities
+- Python 3.8+ with required dependencies
+
+**Known Limitations:**
+
+- **Semantic VAD Transcriptions**: When using `--vad-mode semantic_vad`, user input transcriptions may not be generated. Use `--vad-mode server_vad` if you need reliable user transcriptions for SEI metadata or logging.
+
+**Environment Variables:**
+
+```bash
+export OPENAI_API_KEY="sk-your-openai-api-key-here"
+```
+
+**Example Usage:**
+
+```bash
+# Basic OpenAI conversation
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# Using different voice and model
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --voice "nova" \
+  --model "gpt-4o-realtime-preview-2024-10-01"
+
+# With explicit API key
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --openai-key "sk-..."
+```
 
 ### Stages SEI Publishing
 
@@ -551,18 +663,18 @@ SEI NAL units are part of the H.264/AVC video compression standard that allow em
 
 **Key Features:**
 
--   **Perfect Synchronization**: Metadata is embedded directly in video frames
--   **Low Latency**: No separate data channels needed
--   **Standards Compliant**: Uses official H.264 specification
--   **Multi-format Support**: Handles Annex B, AVCC, and RTP H.264 formats
--   **Automatic Integration**: Patches aiortc and PyAV encoders automatically
--   **Reliable Delivery**: 3x repetition with client-side deduplication
+- **Perfect Synchronization**: Metadata is embedded directly in video frames
+- **Low Latency**: No separate data channels needed
+- **Standards Compliant**: Uses official H.264 specification
+- **Multi-format Support**: Handles Annex B, AVCC, and RTP H.264 formats
+- **Automatic Integration**: Patches aiortc and PyAV encoders automatically
+- **Reliable Delivery**: 3x repetition with client-side deduplication
 
 **Components:**
 
--   **`sei_publisher.py`**: High-level interface for publishing SEI messages
--   **`h264_sei_patch.py`**: Low-level H.264 encoder patching system
--   **`SEI.md`**: Comprehensive documentation and usage guide
+- **`sei_publisher.py`**: High-level interface for publishing SEI messages
+- **`h264_sei_patch.py`**: Low-level H.264 encoder patching system
+- **`SEI.md`**: Comprehensive documentation and usage guide
 
 **Usage Example:**
 
@@ -736,6 +848,45 @@ python stages-nova-s2s/ivs-stage-nova-s2s.py \
   --ice-timeout 1
 ```
 
+#### OpenAI Real-time API Examples
+
+```bash
+# Basic OpenAI real-time conversation
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# Using different voice
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --voice "nova"
+
+# With explicit OpenAI API key
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --openai-key "sk-your-key-here"
+
+# With vision capabilities disabled
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --disable-frame-analysis
+
+# With custom Bedrock model for vision
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --bedrock-model-id "anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+# Fast connection setup
+python stages-open-ai/ivs-stage-openai-realtime.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --ice-timeout 1
+```
+
 #### Publish and Subscribe Example
 
 ```bash
@@ -781,59 +932,59 @@ aws ivs-realtime create-participant-token \
 
 1. **"No audio stream found"**
 
-    - Check if the M3U8 stream contains audio using `ffprobe`
-    - Try different rendition quality options
-    - Verify stream accessibility with `curl`
+   - Check if the M3U8 stream contains audio using `ffprobe`
+   - Try different rendition quality options
+   - Verify stream accessibility with `curl`
 
 2. **"Unable to open video stream"**
 
-    - Verify M3U8 URL is accessible
-    - Check network connectivity and firewall settings
-    - Try different rendition selections
+   - Verify M3U8 URL is accessible
+   - Check network connectivity and firewall settings
+   - Try different rendition selections
 
 3. **Whisper Model Issues**
 
-    - Clear Whisper cache: `rm -rf ~/.cache/whisper/`
-    - Use smaller models for memory-constrained environments
-    - Enable FP16 for faster processing
+   - Clear Whisper cache: `rm -rf ~/.cache/whisper/`
+   - Use smaller models for memory-constrained environments
+   - Enable FP16 for faster processing
 
 4. **Timed Metadata Publishing Issues**
-    - Verify AWS credentials have `ivs:PutMetadata` permissions
-    - Check rate limiting (5 RPS per channel, 155 RPS per account)
-    - Ensure channel ARN extraction is working correctly
+   - Verify AWS credentials have `ivs:PutMetadata` permissions
+   - Check rate limiting (5 RPS per channel, 155 RPS per account)
+   - Ensure channel ARN extraction is working correctly
 
 #### IVS Real-Time Stages Issues
 
 1. **Audio Quality Problems**
 
-    - Ensure consistent chunk sizes (512 samples recommended)
-    - Check audio resampling configuration
-    - Verify WebRTC connection stability
+   - Ensure consistent chunk sizes (512 samples recommended)
+   - Check audio resampling configuration
+   - Verify WebRTC connection stability
 
 2. **WebRTC Connection Failures**
 
-    - Verify JWT token has correct capabilities
-    - Check network connectivity and firewall settings
-    - Ensure SDP munging is applied correctly
+   - Verify JWT token has correct capabilities
+   - Check network connectivity and firewall settings
+   - Ensure SDP munging is applied correctly
 
 3. **Nova Sonic Issues**
-    - Verify AWS credentials have Bedrock permissions
-    - Check model availability in your region
-    - Ensure proper event sequence (START_SESSION → START_PROMPT → content)
+   - Verify AWS credentials have Bedrock permissions
+   - Check model availability in your region
+   - Ensure proper event sequence (START_SESSION → START_PROMPT → content)
 
 #### General Issues
 
 1. **Video Frame Analysis Issues**
 
-    - Verify AWS credentials have `bedrock:InvokeModel` permissions
-    - Check Claude/Pegasus model availability in your region
-    - Monitor analysis costs with appropriate intervals
-    - Ensure video track is receiving frames before analysis begins
+   - Verify AWS credentials have `bedrock:InvokeModel` permissions
+   - Check Claude/Pegasus model availability in your region
+   - Monitor analysis costs with appropriate intervals
+   - Ensure video track is receiving frames before analysis begins
 
 2. **Transcription Accuracy**
-    - Use appropriate Whisper model size for your use case
-    - Ensure clean audio input
-    - Consider language-specific models
+   - Use appropriate Whisper model size for your use case
+   - Ensure clean audio input
+   - Consider language-specific models
 
 ### Debug Mode
 
@@ -851,85 +1002,85 @@ python your-script.py --your-args
 
 1. **For Channel Transcription:**
 
-    - Use `--whisper-model tiny` or `--whisper-model base` for real-time processing
-    - Enable FP16: `--fp16 true`
-    - Use shorter chunks: `--chunk-duration 3`
-    - Specify language: `--language en` (faster than auto-detect)
+   - Use `--whisper-model tiny` or `--whisper-model base` for real-time processing
+   - Enable FP16: `--fp16 true`
+   - Use shorter chunks: `--chunk-duration 3`
+   - Specify language: `--language en` (faster than auto-detect)
 
 2. **For Channel Video Analysis:**
 
-    - Use `--lowest-quality` for faster processing
-    - Adjust `--analysis-duration` based on content complexity
-    - Run without `--show-video` for headless operation
+   - Use `--lowest-quality` for faster processing
+   - Adjust `--analysis-duration` based on content complexity
+   - Run without `--show-video` for headless operation
 
 3. **For Channel Frame Analysis:**
-    - Increase `--analysis-interval` for less frequent analysis (cost control)
-    - Use `--lowest-quality` for faster frame processing
-    - Choose appropriate Claude model for your use case
+   - Increase `--analysis-interval` for less frequent analysis (cost control)
+   - Use `--lowest-quality` for faster frame processing
+   - Choose appropriate Claude model for your use case
 
 #### IVS Real-Time Stages Optimization
 
 1. **Connection Speed:**
 
-    - Use `--ice-timeout 1` for faster WebRTC connection establishment (default)
-    - Original WebRTC ICE timeout is 5 seconds, optimized to 1 second for better user experience
-    - Increase timeout if experiencing connection issues in poor network conditions
-    - This optimization reduces startup time from ~11 seconds to ~3 seconds
+   - Use `--ice-timeout 1` for faster WebRTC connection establishment (default)
+   - Original WebRTC ICE timeout is 5 seconds, optimized to 1 second for better user experience
+   - Increase timeout if experiencing connection issues in poor network conditions
+   - This optimization reduces startup time from ~11 seconds to ~3 seconds
 
 2. **For Nova Sonic:**
 
-    - Use consistent 1ms delays between audio chunks
-    - Implement proper buffering strategies
-    - Monitor memory usage during long sessions
+   - Use consistent 1ms delays between audio chunks
+   - Implement proper buffering strategies
+   - Monitor memory usage during long sessions
 
 3. **For Stage Transcription:**
-    - Choose appropriate chunk duration (5-10 seconds)
-    - Use smaller Whisper models for real-time processing
-    - Consider GPU acceleration for large models
+   - Choose appropriate chunk duration (5-10 seconds)
+   - Use smaller Whisper models for real-time processing
+   - Consider GPU acceleration for large models
 
 #### General Optimization
 
 1. **For Video Frame Analysis:**
-    - Use longer analysis intervals (30+ seconds) to control costs
-    - Choose appropriate Claude model for your use case:
-        - Claude 3.5 Haiku for basic content moderation
-        - Claude 3.5 Sonnet for balanced performance
-        - Claude Sonnet 4 for complex analysis requiring highest accuracy
-    - Monitor Bedrock usage and costs in AWS console
-    - Consider regional model availability and latency
+   - Use longer analysis intervals (30+ seconds) to control costs
+   - Choose appropriate Claude model for your use case:
+     - Claude 3.5 Haiku for basic content moderation
+     - Claude 3.5 Sonnet for balanced performance
+     - Claude Sonnet 4 for complex analysis requiring highest accuracy
+   - Monitor Bedrock usage and costs in AWS console
+   - Consider regional model availability and latency
 
 ## Dependencies
 
 ### Core Dependencies
 
--   `aiortc>=1.12.0` - WebRTC implementation
--   `av>=10.0.0` - Media processing
--   `requests>=2.28.0` - HTTP client
--   `websockets>=11.0.0` - WebSocket client
--   `numpy>=1.21.0` - Numerical computing
+- `aiortc>=1.12.0` - WebRTC implementation
+- `av>=10.0.0` - Media processing
+- `requests>=2.28.0` - HTTP client
+- `websockets>=11.0.0` - WebSocket client
+- `numpy>=1.21.0` - Numerical computing
 
 ### AI/ML Dependencies
 
--   `whisper` (from GitHub) - Speech recognition
--   `boto3>=1.34.0` - AWS SDK for Bedrock and IVS
--   `aws-sdk-bedrock-runtime` - Amazon Bedrock client
--   `smithy-aws-core>=0.0.1` - AWS SDK core
--   `pyaudio>=0.2.13` - Audio I/O
--   `rx>=3.2.0` - Reactive extensions
--   `Pillow>=10.0.0` - Image processing for video frame analysis
--   `opencv-python>=4.8.0` - Computer vision for video processing
+- `whisper` (from GitHub) - Speech recognition
+- `boto3>=1.34.0` - AWS SDK for Bedrock and IVS
+- `aws-sdk-bedrock-runtime` - Amazon Bedrock client
+- `smithy-aws-core>=0.0.1` - AWS SDK core
+- `pyaudio>=0.2.13` - Audio I/O
+- `rx>=3.2.0` - Reactive extensions
+- `Pillow>=10.0.0` - Image processing for video frame analysis
+- `opencv-python>=4.8.0` - Computer vision for video processing
 
 ### Utility Dependencies
 
--   `pytz` - Timezone handling
--   `tzlocal` - Local timezone detection
+- `pytz` - Timezone handling
+- `tzlocal` - Local timezone detection
 
 ### System Requirements
 
--   Python 3.8+
--   FFmpeg
--   PortAudio (for audio I/O)
--   Sufficient bandwidth for WebRTC streams
+- Python 3.8+
+- FFmpeg
+- PortAudio (for audio I/O)
+- Sufficient bandwidth for WebRTC streams
 
 ## Contributing
 
@@ -943,12 +1094,12 @@ This library is licensed under the MIT-0 License. See the [LICENSE](./LICENSE) f
 
 For issues related to:
 
--   **Amazon IVS Real-Time Stages**: Check the [IVS Real-Time Streaming documentation](https://docs.aws.amazon.com/ivs/latest/RealTimeUserGuide/)
--   **Amazon IVS Channels**: Check the [IVS Low-Latency Streaming documentation](https://docs.aws.amazon.com/ivs/latest/LowLatencyUserGuide/)
--   **Amazon Nova**: Check the [Bedrock documentation](https://docs.aws.amazon.com/bedrock/)
--   **Amazon Bedrock**: Check the [Bedrock User Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/)
--   **aiortc**: Check the [aiortc documentation](https://aiortc.readthedocs.io/)
--   **OpenAI Whisper**: Check the [Whisper repository](https://github.com/openai/whisper)
+- **Amazon IVS Real-Time Stages**: Check the [IVS Real-Time Streaming documentation](https://docs.aws.amazon.com/ivs/latest/RealTimeUserGuide/)
+- **Amazon IVS Channels**: Check the [IVS Low-Latency Streaming documentation](https://docs.aws.amazon.com/ivs/latest/LowLatencyUserGuide/)
+- **Amazon Nova**: Check the [Bedrock documentation](https://docs.aws.amazon.com/bedrock/)
+- **Amazon Bedrock**: Check the [Bedrock User Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/)
+- **aiortc**: Check the [aiortc documentation](https://aiortc.readthedocs.io/)
+- **OpenAI Whisper**: Check the [Whisper repository](https://github.com/openai/whisper)
 
 ---
 
