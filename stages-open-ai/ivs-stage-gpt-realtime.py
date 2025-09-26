@@ -47,23 +47,23 @@ async def patched_get_component_candidates(self, component, addresses, timeout=N
 aioice.ice.Connection.get_component_candidates = patched_get_component_candidates
 
 # Local imports
-from openai_audio_track import OpenAIAudioTrack
-from openai_video_track import OpenAIVideoTrack
-from openai_realtime_manager import OpenAIRealtimeManager
+from gpt_realtime_audio_track import GptRealtimeAudioTrack
+from gpt_realtime_video_track import GptRealtimeVideoTrack
+from gpt_realtime_manager import GptRealtimeManager
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
-logger = logging.getLogger("ivs-stage-openai-realtime")
+logger = logging.getLogger("ivs-stage-gpt-realtime")
 logger.setLevel(logging.INFO)
 
 # Set DEBUG level for our modules
-openai_audio_logger = logging.getLogger("openai_audio_track")
-openai_audio_logger.setLevel(logging.INFO)
-openai_realtime_logger = logging.getLogger("openai_realtime_manager")
-openai_realtime_logger.setLevel(logging.INFO)
+gpt_realtime_audio_logger = logging.getLogger("gpt_realtime_audio_track")
+gpt_realtime_audio_logger.setLevel(logging.INFO)
+gpt_realtime_realtime_logger = logging.getLogger("gpt_realtime_realtime_manager")
+gpt_realtime_realtime_logger.setLevel(logging.INFO)
 
 # Suppress noisy external loggers
 aiortc_logger = logging.getLogger("aiortc")
@@ -237,9 +237,9 @@ async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: in
     return None
 
 
-async def join_stage_as_publisher(token: str, openai_audio_track: OpenAIAudioTrack, openai_video_track: OpenAIVideoTrack):
-    """Join the IVS stage as a publisher using WebRTC with OpenAI audio and video"""
-    logger.info("🚀 Joining stage as publisher with OpenAI audio and video...")
+async def join_stage_as_publisher(token: str, gpt_realtime_audio_track: GptRealtimeAudioTrack, gpt_realtime_video_track: GptRealtimeVideoTrack):
+    """Join the IVS stage as a publisher using WebRTC with gpt-realtime audio and video"""
+    logger.info("🚀 Joining stage as publisher with gpt-realtime audio and video...")
 
     # Create peer connection
     config = RTCConfiguration()
@@ -252,15 +252,15 @@ async def join_stage_as_publisher(token: str, openai_audio_track: OpenAIAudioTra
 
     # Add tracks to peer connection
     logger.info("🔈 Adding OpenAI audio track")
-    pc.addTransceiver(openai_audio_track, direction="sendrecv")
+    pc.addTransceiver(gpt_realtime_audio_track, direction="sendrecv")
 
     logger.info("🔵 Adding OpenAI video track")
-    pc.addTransceiver(openai_video_track, direction="sendrecv")
+    pc.addTransceiver(gpt_realtime_video_track, direction="sendrecv")
 
     # Set peer connection for WebRTC stats collection
     logger.info("🔗 About to set peer connection on audio track...")
     try:
-        openai_audio_track.set_peer_connection(pc)
+        gpt_realtime_audio_track.set_peer_connection(pc)
         logger.info("🔗 Peer connection set successfully")
     except Exception as e:
         logger.error(f"❌ Failed to set peer connection: {e}")
@@ -291,7 +291,7 @@ async def join_stage_as_publisher(token: str, openai_audio_track: OpenAIAudioTra
     return pc
 
 
-async def subscribe_to_participant(token: str, participant_id: str, openai_realtime_manager: OpenAIRealtimeManager):
+async def subscribe_to_participant(token: str, participant_id: str, gpt_realtime_realtime_manager: GptRealtimeManager):
     """Subscribe to a participant's audio/video streams and process audio through OpenAI"""
     logger.info(f"🎧 Subscribing to participant: {participant_id}")
 
@@ -378,7 +378,7 @@ async def subscribe_to_participant(token: str, participant_id: str, openai_realt
                     for i, resampled_frame in enumerate(resampled_frames):
                         # Convert to bytes and send directly to OpenAI
                         audio_bytes = resampled_frame.to_ndarray().tobytes()
-                        await openai_realtime_manager.add_audio_chunk(audio_bytes)
+                        await gpt_realtime_realtime_manager.add_audio_chunk(audio_bytes)
 
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout waiting for audio frame {frame_count} - no audio data received in 5 seconds")
@@ -401,7 +401,7 @@ async def subscribe_to_participant(token: str, participant_id: str, openai_realt
                 frame = await track.recv()
                 frame_count += 1
                 # Set current frame for analysis
-                openai_realtime_manager.set_current_frame(frame)
+                gpt_realtime_realtime_manager.set_current_frame(frame)
         except Exception as e:
             logger.info(f"Video track ended for participant {participant_id}: {e}")
 
@@ -576,19 +576,21 @@ async def main():
 
     try:
         connections = []
-        openai_realtime_manager = None
+        gpt_realtime_realtime_manager = None
 
         # Create OpenAI video track for visualization
-        openai_video_track = OpenAIVideoTrack(width=1280, height=720, fps=25)
+        gpt_realtime_video_track = GptRealtimeVideoTrack(width=1280, height=720, fps=25)
 
         # Create OpenAI audio track for publishing responses
-        openai_audio_track = OpenAIAudioTrack(openai_video_track=openai_video_track, sample_rate=OUTPUT_SAMPLE_RATE, channels=CHANNELS)
+        gpt_realtime_audio_track = GptRealtimeAudioTrack(
+            gpt_realtime_video_track=gpt_realtime_video_track, sample_rate=OUTPUT_SAMPLE_RATE, channels=CHANNELS
+        )
 
         # Initialize OpenAI real-time manager
-        logger.info("🤖 Initializing OpenAI real-time API...")
-        openai_realtime_manager = OpenAIRealtimeManager(
-            openai_audio_track=openai_audio_track,
-            openai_video_track=openai_video_track,
+        logger.info("🤖 Initializing gpt-realtime API...")
+        gpt_realtime_realtime_manager = GptRealtimeManager(
+            gpt_realtime_audio_track=gpt_realtime_audio_track,
+            gpt_realtime_video_track=gpt_realtime_video_track,
             api_key=openai_api_key,
             model=args.model,
             voice=args.voice,
@@ -601,14 +603,14 @@ async def main():
             vad_silence_duration_ms=args.vad_silence_duration_ms,
             vad_eagerness=args.vad_eagerness,
         )
-        await openai_realtime_manager.initialize()
+        await gpt_realtime_realtime_manager.initialize()
 
         # Start subscribing to participants if specified
         if args.subscribe_to:
             participant_id = args.subscribe_to
             logger.info(f"📥 Starting subscribe mode for participant: {participant_id}")
 
-            subscribe_pc = await subscribe_to_participant(args.token, participant_id, openai_realtime_manager)
+            subscribe_pc = await subscribe_to_participant(args.token, participant_id, gpt_realtime_realtime_manager)
 
             if subscribe_pc:
                 logger.info(f"✅ Successfully subscribed to {participant_id} with OpenAI processing")
@@ -622,7 +624,7 @@ async def main():
 
         # Start publishing
         logger.info("📤 Starting publish mode with OpenAI audio and video...")
-        publish_pc = await join_stage_as_publisher(args.token, openai_audio_track, openai_video_track)
+        publish_pc = await join_stage_as_publisher(args.token, gpt_realtime_audio_track, gpt_realtime_video_track)
 
         if publish_pc:
             logger.info("🎉 WebRTC publishing established with OpenAI audio and video!")
@@ -647,9 +649,9 @@ async def main():
             logger.info("🛑 Shutting down...")
         finally:
             # Clean up OpenAI real-time manager
-            if openai_realtime_manager:
+            if gpt_realtime_realtime_manager:
                 logger.info("🤖 Closing OpenAI real-time connection...")
-                await openai_realtime_manager.close()
+                await gpt_realtime_realtime_manager.close()
 
             # Clean up all peer connections
             logger.info("🔌 Closing all connections...")

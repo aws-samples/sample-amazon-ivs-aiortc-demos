@@ -15,10 +15,10 @@ from datetime import datetime, timezone
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("ivs-stage-openai-assistant-manager")
+logger = logging.getLogger("ivs-stage-gpt-realtime-assistant-manager")
 
 
-class IVSStageOpenAIAssistantManager:
+class IVSStageGptRealtimeAssistantManager:
     def __init__(
         self, chat_room_arn: str, ws_endpoint: str, openai_api_key: str, max_instances: int = 5, region: str = "us-east-1", verbose: bool = False
     ):
@@ -34,7 +34,7 @@ class IVSStageOpenAIAssistantManager:
         self.ivs_realtime_client = boto3.client("ivs-realtime", region_name=region)
         self.chat_token = None
         self.websocket = None
-        self.manager_user_id = f"openai-assistant-manager-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+        self.manager_user_id = f"gpt-realtimeassistant-manager-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
 
     async def generate_chat_token(self) -> str:
         """Generate a new chat token for connecting to the IVS chat room"""
@@ -58,7 +58,7 @@ class IVSStageOpenAIAssistantManager:
         try:
             response = self.ivs_realtime_client.create_participant_token(
                 stageArn=stage_arn,
-                userId=f"openai-assistant-{participant_id}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
+                userId=f"gpt-realtimeassistant-{participant_id}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}",
                 capabilities=["PUBLISH", "SUBSCRIBE"],
                 duration=720,  # 12 hours
             )
@@ -83,8 +83,8 @@ class IVSStageOpenAIAssistantManager:
             "vadEagerness": "medium",  # Optional: low, medium, high, auto for semantic_vad
         }
 
-    async def launch_openai_instance(self, stage_arn: str, participant_id: str, config: Dict[str, Any] = None) -> tuple[bool, str]:
-        """Launch a new instance of the OpenAI real-time script"""
+    async def launch_gpt_realtime_instance(self, stage_arn: str, participant_id: str, config: Dict[str, Any] = None) -> tuple[bool, str]:
+        """Launch a new instance of the gpt-realtime script"""
         if len(self.active_instances) >= self.max_instances:
             logger.warning(f"⚠️  Maximum instances ({self.max_instances}) reached. Cannot launch new instance for participant {participant_id}")
             return False, "MAX_INSTANCES_REACHED"
@@ -98,8 +98,8 @@ class IVSStageOpenAIAssistantManager:
             logger.info(f"🎫 Generating stage token for participant {participant_id}")
             token = await self.generate_stage_token(stage_arn, participant_id)
 
-            # Build command to launch the OpenAI real-time script
-            script_path = os.path.join(os.path.dirname(__file__), "ivs-stage-openai-realtime.py")
+            # Build command to launch the gpt-realtime script
+            script_path = os.path.join(os.path.dirname(__file__), "ivs-stage-gpt-realtime.py")
             cmd = [sys.executable, script_path, "--token", token, "--subscribe-to", participant_id, "--openai-key", self.openai_api_key]
 
             # Add optional configuration parameters
@@ -133,7 +133,7 @@ class IVSStageOpenAIAssistantManager:
                 if bedrock_region:
                     cmd.extend(["--bedrock-region", bedrock_region])
 
-            logger.info(f"🚀 Launching OpenAI instance for participant {participant_id}")
+            logger.info(f"🚀 Launching gpt-realtime instance for participant {participant_id}")
             logger.debug(f"Command: {' '.join(cmd)}")
 
             # Launch the process with appropriate output handling
@@ -146,7 +146,7 @@ class IVSStageOpenAIAssistantManager:
 
             self.active_instances[participant_id] = process
             self.instance_stage_arns[participant_id] = stage_arn  # Store stage ARN for logging
-            logger.info(f"✅ OpenAI instance launched for participant {participant_id} (PID: {process.pid})")
+            logger.info(f"✅ gpt-realtime instance launched for participant {participant_id} (PID: {process.pid})")
             logger.debug(f"🏷️  Stored stage ARN for {participant_id}: {stage_arn}")
 
             # Start monitoring the process
@@ -155,11 +155,11 @@ class IVSStageOpenAIAssistantManager:
             return True, "SUCCESS"
 
         except Exception as e:
-            logger.error(f"❌ Failed to launch OpenAI instance for participant {participant_id}: {e}")
+            logger.error(f"❌ Failed to launch gpt-realtime instance for participant {participant_id}: {e}")
             return False, "LAUNCH_FAILED"
 
     async def monitor_instance(self, participant_id: str, process: subprocess.Popen):
-        """Monitor an OpenAI instance and clean up when it exits"""
+        """Monitor a gpt-realtime instance and clean up when it exits"""
         try:
             if self.verbose and process.stdout:
                 # Stream output in verbose mode
@@ -194,7 +194,7 @@ class IVSStageOpenAIAssistantManager:
                 # Non-verbose mode - just wait for process to complete
                 return_code = await asyncio.get_event_loop().run_in_executor(None, process.wait)
 
-            logger.info(f"🏁 OpenAI instance for participant {participant_id} exited with code {return_code}")
+            logger.info(f"🏁 gpt-realtime instance for participant {participant_id} exited with code {return_code}")
 
             # Clean up from active instances
             if participant_id in self.active_instances:
@@ -212,7 +212,7 @@ class IVSStageOpenAIAssistantManager:
                 del self.instance_stage_arns[participant_id]
 
     async def stream_output(self, participant_id: str, process: subprocess.Popen):
-        """Stream output from an OpenAI instance in real-time"""
+        """Stream output from an gpt-realtime instance in real-time"""
         try:
             # Get the stage ARN for this participant (extract just the stage ID for brevity)
             stage_arn = self.instance_stage_arns.get(participant_id, "unknown-stage")
@@ -305,16 +305,16 @@ class IVSStageOpenAIAssistantManager:
             }
 
             # Launch OpenAI instance
-            success, error_code = await self.launch_openai_instance(stage_arn, participant_id, config)
+            success, error_code = await self.launch_gpt_realtime_instance(stage_arn, participant_id, config)
 
             if success:
-                logger.info(f"🎉 Successfully launched OpenAI instance for participant {participant_id}")
+                logger.info(f"🎉 Successfully launched gpt-realtime instance for participant {participant_id}")
                 logger.info(f"📊 Active instances: {len(self.active_instances)}/{self.max_instances}")
             else:
-                logger.error(f"❌ Failed to launch OpenAI instance for participant {participant_id}: {error_code}")
+                logger.error(f"❌ Failed to launch gpt-realtime instance for participant {participant_id}: {error_code}")
                 # Send error response back to the frontend
                 await self.send_error_response(
-                    error_code, stage_arn, participant_id, f"Failed to launch OpenAI assistant for participant {participant_id}"
+                    error_code, stage_arn, participant_id, f"Failed to launch gpt-realtime assistant for participant {participant_id}"
                 )
 
         except json.JSONDecodeError as e:
@@ -383,13 +383,13 @@ class IVSStageOpenAIAssistantManager:
 
 def parse_args():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(description="IVS Stage OpenAI Assistant Manager - WebSocket listener for OpenAI real-time instances")
+    parser = argparse.ArgumentParser(description="IVS Stage gpt-realtime Assistant Manager - WebSocket listener for gpt-realtime real-time instances")
     parser.add_argument("--chat-room-arn", required=True, help="IVS Chat room ARN")
     parser.add_argument("--ws-endpoint", required=True, help="WebSocket endpoint URL")
     parser.add_argument("--openai-key", help="OpenAI API key (overrides OPENAI_API_KEY environment variable)")
-    parser.add_argument("--max-instances", type=int, default=5, help="Maximum number of OpenAI instances (default: 5)")
+    parser.add_argument("--max-instances", type=int, default=5, help="Maximum number of gpt-realtime instances (default: 5)")
     parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output from spawned OpenAI instances")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output from spawned gpt-realtime instances")
 
     return parser.parse_args()
 
@@ -404,7 +404,7 @@ async def main():
         logger.error("❌ OpenAI API key not provided. Use --openai-key or set OPENAI_API_KEY environment variable")
         return
 
-    logger.info("🎬 Starting IVS Stage OpenAI Assistant Manager")
+    logger.info("🎬 Starting IVS Stage gpt-realtime Assistant Manager")
     logger.info(f"📺 Chat Room ARN: {args.chat_room_arn}")
     logger.info(f"🔌 WebSocket Endpoint: {args.ws_endpoint}")
     logger.info(f"🔢 Max Instances: {args.max_instances}")
@@ -412,7 +412,7 @@ async def main():
     logger.info(f"📢 Verbose Output: {'enabled' if args.verbose else 'disabled'}")
 
     # Create manager and log its user ID
-    manager = IVSStageOpenAIAssistantManager(
+    manager = IVSStageGptRealtimeAssistantManager(
         chat_room_arn=args.chat_room_arn,
         ws_endpoint=args.ws_endpoint,
         openai_api_key=openai_api_key,
@@ -420,7 +420,7 @@ async def main():
         region=args.region,
         verbose=args.verbose,
     )
-    logger.info(f"👤 OpenAI Assistant Manager User ID: {manager.manager_user_id}")
+    logger.info(f"👤 Gpt Realtime Assistant Manager User ID: {manager.manager_user_id}")
 
     await manager.run()
 

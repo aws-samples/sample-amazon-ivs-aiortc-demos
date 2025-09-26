@@ -10,9 +10,9 @@ from aiortc import VideoStreamTrack
 logger = logging.getLogger(__name__)
 
 
-class OpenAIVideoTrack(VideoStreamTrack):
+class GptRealtimeVideoTrack(VideoStreamTrack):
     """
-    A video track that provides visual feedback for OpenAI real-time API conversations
+    A video track that provides visual feedback for gpt-realtime API conversations
     """
 
     def __init__(self, width=1280, height=720, fps=25):
@@ -37,7 +37,7 @@ class OpenAIVideoTrack(VideoStreamTrack):
         self.active_color = (100, 200, 100)  # Green for active speaking
         self.accent_color = (255, 255, 255)  # White for accents
 
-        logger.info(f"🎥 OpenAIVideoTrack initialized - {width}x{height} @ {fps}fps")
+        logger.info(f"🎥 GptRealtimeVideoTrack initialized - {width}x{height} @ {fps}fps")
 
     def update_audio_level(self, level: float):
         """Update the audio level for visualization (0.0 to 1.0)"""
@@ -78,7 +78,7 @@ class OpenAIVideoTrack(VideoStreamTrack):
             return frame
 
         except Exception as e:
-            logger.error(f"Error in OpenAIVideoTrack.recv: {e}")
+            logger.error(f"Error in GptRealtimeVideoTrack.recv: {e}")
             raise
 
     def _create_visualization_frame(self) -> VideoFrame:
@@ -102,9 +102,6 @@ class OpenAIVideoTrack(VideoStreamTrack):
         else:
             # Idle visualization - gentle breathing animation
             self._draw_idle_visualization(frame_array, center_x, center_y)
-
-        # Add OpenAI branding text
-        self._draw_text_overlay(frame_array)
 
         # Convert to VideoFrame
         frame = VideoFrame.from_ndarray(frame_array, format="rgb24")
@@ -140,16 +137,6 @@ class OpenAIVideoTrack(VideoStreamTrack):
         # Draw inner dot
         inner_radius = int(8 * breath_factor)
         self._draw_circle(frame_array, center_x, center_y, inner_radius, self.idle_color, filled=True)
-
-    def _draw_text_overlay(self, frame_array):
-        """Draw text overlay with OpenAI branding"""
-        # Simple text rendering - just draw "OpenAI" at the bottom
-        text_y = self.height - 30
-        text_x = 20
-
-        # Draw simple text (very basic implementation)
-        text = "OpenAI Real-time API"
-        self._draw_simple_text(frame_array, text, text_x, text_y, self.accent_color)
 
     def _draw_simple_text(self, frame_array, text, x, y, color):
         """Draw simple text (basic implementation)"""

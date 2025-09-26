@@ -1,15 +1,15 @@
 # IVS Stages OpenAI Real-time API Integration
 
-This module provides speech-to-speech conversation capabilities using OpenAI's real-time API with Amazon IVS stages.
+This module provides speech-to-speech conversation capabilities using OpenAI's `gpt-realtime` API with Amazon IVS stages.
 
 ## Features
 
 - Subscribe to IVS stage participants for audio input
-- Process audio through OpenAI's real-time API for speech-to-speech conversations
+- Process audio through OpenAI's `gpt-realtime` API for speech-to-speech conversations
 - Publish AI responses back to the IVS stage
 - WebSocket-based real-time communication with OpenAI
 - **Vision capabilities**: AI-powered video frame analysis using Amazon Bedrock Claude models
-- **Function calling**: OpenAI function calling for vision and other capabilities
+- **Function calling**: for vision and other capabilities
 - Real-time audio visualization with OpenAI branding
 - Voice activity detection and interruption handling
 - Multiple voice options (alloy, echo, fable, onyx, nova, shimmer)
@@ -24,7 +24,7 @@ This module provides speech-to-speech conversation capabilities using OpenAI's r
 ## Usage
 
 ```bash
-python ivs-stage-openai-realtime.py --token <IVS_TOKEN> --subscribe-to <PARTICIPANT_ID> --openai-key <OPENAI_API_KEY>
+python ivs-stage-gpt-realtime.py --token <IVS_TOKEN> --subscribe-to <PARTICIPANT_ID> --openai-key <OPENAI_API_KEY>
 ```
 
 ## Arguments

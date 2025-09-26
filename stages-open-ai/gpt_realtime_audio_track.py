@@ -9,18 +9,18 @@ from aiortc import AudioStreamTrack
 logger = logging.getLogger(__name__)
 
 
-class OpenAIAudioTrack(AudioStreamTrack):
+class GptRealtimeAudioTrack(AudioStreamTrack):
     """
-    An audio track that streams OpenAI real-time API responses
+    An audio track that streams gpt-realtime API responses
     """
 
-    def __init__(self, openai_video_track=None, sample_rate=24000, channels=1, chunk_size=None):
+    def __init__(self, gpt_realtime_video_track=None, sample_rate=24000, channels=1, chunk_size=None):
         super().__init__()
 
         # Audio configuration
         self.sample_rate = sample_rate
         self.channels = channels
-        self.openai_video_track = openai_video_track  # Reference to update visualization
+        self.gpt_realtime_video_track = gpt_realtime_video_track  # Reference to update visualization
 
         # Chunk size for 20ms at 24kHz (480 samples * 2 bytes per sample)
         self.chunk_size_bytes = 480 * 2  # 20ms chunks
@@ -54,7 +54,7 @@ class OpenAIAudioTrack(AudioStreamTrack):
         self.target_fps = 50.0  # Target 50 FPS (20ms chunks)
 
         logger.info(
-            f"🔊 OpenAIAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
+            f"🔊 GptRealtimeAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
         )
 
     def set_peer_connection(self, pc):
@@ -79,13 +79,13 @@ class OpenAIAudioTrack(AudioStreamTrack):
             batch_buffer_size = len(self.batch_buffer)
 
             logger.info(
-                f"📊 OpenAI Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
+                f"📊 Gpt Realtime Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
                 f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
                 f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
             )
 
     async def recv(self):
-        """Generate and return audio frames from OpenAI responses"""
+        """Generate and return audio frames from Gpt Realtime responses"""
         try:
             # Print debug stats periodically
             await self._print_debug_stats()
@@ -131,11 +131,11 @@ class OpenAIAudioTrack(AudioStreamTrack):
             audio_array = np.frombuffer(chunk_data, dtype=np.int16)
 
             # Update video visualization based on this audio chunk
-            if self.openai_video_track and len(audio_array) > 0:
+            if self.gpt_realtime_video_track and len(audio_array) > 0:
                 # Calculate RMS level for visualization
                 rms = np.sqrt(np.mean(audio_array.astype(np.float32) ** 2))
                 normalized_level = min(rms / 2000.0, 1.0)
-                self.openai_video_track.update_audio_level(normalized_level)
+                self.gpt_realtime_video_track.update_audio_level(normalized_level)
 
             # Create AudioFrame
             frame = AudioFrame.from_ndarray(audio_array.reshape(1, -1), format="s16", layout="mono")
@@ -163,7 +163,7 @@ class OpenAIAudioTrack(AudioStreamTrack):
             return frame
 
         except Exception as e:
-            logger.error(f"Error in OpenAIAudioTrack.recv: {e}")
+            logger.error(f"Error in GptRealtimeAudioTrack.recv: {e}")
             raise
 
     async def add_audio_data(self, audio_data: bytes):
@@ -196,7 +196,7 @@ class OpenAIAudioTrack(AudioStreamTrack):
 
                     # Log batch processing
                     if old_buffer_size == 0 and new_buffer_size > 0:
-                        logger.info(f"🎵 OpenAI audio started: +{len(batch_data)} bytes (batched)")
+                        logger.info(f"🎵 Gpt Realtime audio started: +{len(batch_data)} bytes (batched)")
                     else:
                         logger.debug(f"🎵 Batch processed: +{len(batch_data)} bytes, buffer: {new_buffer_size} bytes")
 
@@ -232,11 +232,11 @@ class OpenAIAudioTrack(AudioStreamTrack):
         async with self.buffer_lock:
             self.audio_buffer.clear()
             self.batch_buffer.clear()  # Clear batch buffer too
-            logger.info("🛑 OpenAI audio buffer cleared due to interruption")
+            logger.info("🛑 Gpt Realtime audio buffer cleared due to interruption")
 
         # Reset video visualization to idle state
-        if self.openai_video_track:
-            self.openai_video_track.update_audio_level(0.0)
+        if self.gpt_realtime_video_track:
+            self.gpt_realtime_video_track.update_audio_level(0.0)
 
     async def stop(self):
         """Stop the audio track"""

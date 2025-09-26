@@ -25,7 +25,7 @@ The OpenAI Assistant Manager is a WebSocket-based service that:
                                      ┌──────────────────────────┐
                                      │  OpenAI Real-time        │
                                      │  Assistant Instances     │
-                                     │  (ivs-stage-openai-      │
+                                     │  (ivs-stage-gpt-realtime      │
                                      │   realtime.py)           │
                                      └──────────────────────────┘
                                                     │
@@ -71,7 +71,7 @@ Your AWS credentials need:
 ### Environment Variables
 
 ```bash
-export OPENAI_API_KEY="sk-your-openai-api-key-here"
+export OPENAI_API_KEY="your-openai-api-key-here"
 export AWS_REGION="us-east-1"
 export AWS_ACCESS_KEY_ID="your-access-key"
 export AWS_SECRET_ACCESS_KEY="your-secret-key"
@@ -82,7 +82,7 @@ export AWS_SECRET_ACCESS_KEY="your-secret-key"
 ### Basic Usage
 
 ```bash
-python ivs-stage-openai-assistant-manager.py \
+python ivs-stage-gpt-realtime-assistant-manager.py \
   --chat-room-arn "arn:aws:ivschat:us-east-1:123456789012:room/abcdefgh" \
   --ws-endpoint "wss://edge.ivschat.us-east-1.amazonaws.com" \
   --openai-key "sk-your-key-here"
@@ -91,7 +91,7 @@ python ivs-stage-openai-assistant-manager.py \
 ### Advanced Usage
 
 ```bash
-python ivs-stage-openai-assistant-manager.py \
+python ivs-stage-gpt-realtime-assistant-manager.py \
   --chat-room-arn "arn:aws:ivschat:us-east-1:123456789012:room/abcdefgh" \
   --ws-endpoint "wss://edge.ivschat.us-east-1.amazonaws.com" \
   --openai-key "sk-your-key-here" \
@@ -115,7 +115,7 @@ python ivs-stage-openai-assistant-manager.py \
 
 ### Launch Assistant Message
 
-Send this JSON message through IVS Chat to launch an OpenAI assistant:
+Send this JSON message through IVS Chat to launch a gpt-realtime assistant:
 
 ```json
 {
@@ -142,7 +142,7 @@ Send this JSON message through IVS Chat to launch an OpenAI assistant:
 
 #### Voice Options
 
-- **`voice`**: OpenAI voice to use
+- **`voice`**: gpt-realtime voice to use
   - Options: `"alloy"`, `"ash"`, `"ballad"`, `"coral"`, `"echo"`, `"sage"`, `"shimmer"`, `"verse"`, `"marin"`, `"cedar"`
   - Default: `"cedar"`
 
@@ -258,10 +258,10 @@ The manager provides detailed logging:
 
 ### Verbose Mode
 
-Enable `--verbose` to see real-time output from all spawned OpenAI assistants:
+Enable `--verbose` to see real-time output from all spawned gpt-realtime assistants:
 
 ```bash
-python ivs-stage-openai-assistant-manager.py \
+python ivs-stage-gpt-realtime-assistant-manager.py \
   --chat-room-arn "..." \
   --ws-endpoint "..." \
   --verbose
@@ -270,7 +270,7 @@ python ivs-stage-openai-assistant-manager.py \
 Output format:
 
 ```
-[stage-id::participant-id] OpenAI assistant log message
+[stage-id::participant-id] gpt-realtime assistant log message
 ```
 
 ### Instance Monitoring
@@ -323,7 +323,7 @@ import json
 ivschat = boto3.client('ivschat', region_name='us-east-1')
 
 # Send launch message
-def launch_openai_assistant(room_arn, stage_arn, participant_id, **config):
+def launch_gpt_realtime_assistant(room_arn, stage_arn, participant_id, **config):
     # Generate chat token
     token_response = ivschat.create_chat_token(
         roomIdentifier=room_arn,
@@ -348,7 +348,7 @@ def launch_openai_assistant(room_arn, stage_arn, participant_id, **config):
     )
 
 # Example usage
-launch_openai_assistant(
+launch_gpt_realtime_assistant(
     room_arn='arn:aws:ivschat:us-east-1:123456789012:room/abcdefgh',
     stage_arn='arn:aws:ivs:us-east-1:123456789012:stage/abcdefgh',
     participant_id='user-123',
@@ -398,7 +398,7 @@ launch_openai_assistant(
 **OpenAI Instance Launch Fails**
 
 ```
-❌ Failed to launch OpenAI instance: LAUNCH_FAILED
+❌ Failed to launch gpt-realtime instance: LAUNCH_FAILED
 ```
 
 - Check OpenAI API key validity
@@ -437,19 +437,19 @@ Monitor system resources:
 
 ## Conclusion
 
-The OpenAI Assistant Manager provides a powerful way to dynamically manage multiple OpenAI real-time assistants through simple WebSocket messages. It handles the complexity of:
+The Gpt Realtime Assistant Manager provides a powerful way to dynamically manage multiple Gpt Realtime real-time assistants through simple WebSocket messages. It handles the complexity of:
 
 - **Token management** for both IVS Chat and Real-Time Stages
 - **Process lifecycle** management with monitoring and cleanup
-- **Configuration flexibility** with full OpenAI parameter support
+- **Configuration flexibility** with full Gpt Realtime parameter support
 - **Error handling** with detailed feedback
 - **Resource management** with configurable limits
 
-This enables building scalable, interactive applications where OpenAI assistants can be launched on-demand for any participant in an IVS stage, with full control over voice, VAD settings, and vision capabilities.
+This enables building scalable, interactive applications where Gpt Realtime assistants can be launched on-demand for any participant in an IVS stage, with full control over voice, VAD settings, and vision capabilities.
 
 ## Related Documentation
 
-- [OpenAI Real-time API Integration](README.md)
+- [Gpt Realtime API Integration](README.md)
 - [Nova S2S Assistant Manager](../stages-nova-s2s/MANAGING_ASSISTANT_DEMO.md)
 - [IVS Real-Time Stages Documentation](https://docs.aws.amazon.com/ivs/latest/RealTimeUserGuide/)
-- [OpenAI Real-time API Documentation](https://platform.openai.com/docs/guides/realtime)
+- [Gpt Realtime API Documentation](https://platform.openai.com/docs/guides/realtime)

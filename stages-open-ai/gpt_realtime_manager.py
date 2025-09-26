@@ -19,15 +19,15 @@ from stages_sei import SeiPublisher, set_global_sei_publisher
 logger = logging.getLogger(__name__)
 
 
-class OpenAIRealtimeManager:
+class GptRealtimeManager:
     """
-    Manages the OpenAI real-time API WebSocket connection and handles audio streaming
+    Manages the gpt-realtime API WebSocket connection and handles audio streaming
     """
 
     def __init__(
         self,
-        openai_audio_track,
-        openai_video_track,
+        gpt_realtime_audio_track,
+        gpt_realtime_video_track,
         api_key: str,
         model: str = "gpt-realtime",
         voice: str = "cedar",
@@ -40,8 +40,8 @@ class OpenAIRealtimeManager:
         vad_silence_duration_ms: int = 500,
         vad_eagerness: str = "medium",
     ):
-        self.openai_audio_track = openai_audio_track
-        self.openai_video_track = openai_video_track
+        self.gpt_realtime_audio_track = gpt_realtime_audio_track
+        self.gpt_realtime_video_track = gpt_realtime_video_track
         self.api_key = api_key
         self.model = model
         self.voice = voice
@@ -98,12 +98,12 @@ class OpenAIRealtimeManager:
         set_global_sei_publisher(self.sei_publisher)
         logger.info("📡 SEI Publisher initialized for H.264 metadata transmission")
 
-        logger.info(f"🤖 OpenAIRealtimeManager initialized - model: {model}, voice: {voice}")
+        logger.info(f"🤖 GptRealtimeManager initialized - model: {model}, voice: {voice}")
 
     async def initialize(self):
-        """Initialize the OpenAI real-time API connection"""
+        """Initialize the gpt-realtime API connection"""
         try:
-            logger.info("🔗 Connecting to OpenAI real-time API...")
+            logger.info("🔗 Connecting to gpt-realtime API...")
 
             # Connect to WebSocket with authentication
             headers = {"Authorization": f"Bearer {self.api_key}", "OpenAI-Beta": "realtime=v1"}
@@ -111,7 +111,7 @@ class OpenAIRealtimeManager:
             self.websocket = await websockets.connect(self.websocket_url, additional_headers=headers, ping_interval=20, ping_timeout=10)
 
             self.connected = True
-            logger.info("✅ Connected to OpenAI real-time API")
+            logger.info("✅ Connected to gpt-realtime API")
 
             # Start receive and send tasks
             self.receive_task = asyncio.create_task(self._receive_messages())
@@ -121,11 +121,11 @@ class OpenAIRealtimeManager:
             await self._configure_session()
 
         except Exception as e:
-            logger.error(f"❌ Failed to initialize OpenAI real-time API: {e}")
+            logger.error(f"❌ Failed to initialize gpt-realtime API: {e}")
             raise
 
     async def _configure_session(self):
-        """Configure the OpenAI session with desired settings"""
+        """Configure the gpt-realtime session with desired settings"""
         try:
             session_config = {
                 "type": "session.update",
@@ -149,13 +149,13 @@ class OpenAIRealtimeManager:
             }
 
             await self.websocket.send(json.dumps(session_config))
-            logger.info("📝 Sent session configuration to OpenAI")
+            logger.info("📝 Sent session configuration to gpt-realtime")
 
         except Exception as e:
             logger.error(f"❌ Failed to configure session: {e}")
 
     def _get_function_definitions(self):
-        """Get function definitions for OpenAI function calling"""
+        """Get function definitions for gpt-realtime function calling"""
         functions = []
 
         if self.enable_frame_analysis:
@@ -206,7 +206,7 @@ class OpenAIRealtimeManager:
             }
 
     async def _receive_messages(self):
-        """Receive and process messages from OpenAI real-time API"""
+        """Receive and process messages from gpt-realtime API"""
         try:
             while self.connected and self.websocket:
                 try:
@@ -215,7 +215,7 @@ class OpenAIRealtimeManager:
                     await self._handle_message(data)
 
                 except websockets.exceptions.ConnectionClosed:
-                    logger.info("🔌 OpenAI WebSocket connection closed")
+                    logger.info("🔌 gpt-realtime WebSocket connection closed")
                     break
                 except json.JSONDecodeError as e:
                     logger.error(f"❌ Failed to decode JSON message: {e}")
@@ -228,15 +228,15 @@ class OpenAIRealtimeManager:
             self.connected = False
 
     async def _handle_message(self, data: Dict[str, Any]):
-        """Handle incoming messages from OpenAI"""
+        """Handle incoming messages from gpt-realtime"""
         message_type = data.get("type", "unknown")
 
         if message_type == "session.created":
             self.session_id = data.get("session", {}).get("id")
-            logger.info(f"✅ OpenAI session created: {self.session_id}")
+            logger.info(f"✅ gpt-realtime session created: {self.session_id}")
 
         elif message_type == "session.updated":
-            logger.info("✅ OpenAI session updated")
+            logger.info("✅ gpt-realtime session updated")
 
         elif message_type == "conversation.item.created":
             item = data.get("item", {})
@@ -267,14 +267,14 @@ class OpenAIRealtimeManager:
             logger.debug(f"📄 Content part added: {part.get('type', 'unknown')}")
 
         elif message_type == "response.audio.delta":
-            # Receive audio data from OpenAI
+            # Receive audio data from gpt-realtime
             delta = data.get("delta")
             if delta:
                 try:
                     # Decode base64 audio data
                     audio_bytes = base64.b64decode(delta)
                     # Add to audio track for playback
-                    await self.openai_audio_track.add_audio_data(audio_bytes)
+                    await self.gpt_realtime_audio_track.add_audio_data(audio_bytes)
                     logger.debug(f"🔊 Received audio delta: {len(audio_bytes)} bytes")
                 except Exception as e:
                     logger.error(f"❌ Error processing audio delta: {e}")
@@ -283,17 +283,17 @@ class OpenAIRealtimeManager:
             logger.info("✅ Audio response completed")
 
         elif message_type == "response.audio_transcript.delta":
-            # Handle streaming audio transcript from OpenAI
+            # Handle streaming audio transcript from gpt-realtime
             delta = data.get("delta")
             if delta:
-                logger.debug(f"🤖 OpenAI transcript delta: {delta}")
+                logger.debug(f"🤖 gpt-realtime transcript delta: {delta}")
 
         elif message_type == "response.audio_transcript.done":
-            # Handle completed audio transcript from OpenAI
+            # Handle completed audio transcript from gpt-realtime
             transcript = data.get("transcript", "")
             if transcript:
-                logger.info(f"🤖 OpenAI said: {transcript}")
-                # Publish OpenAI response as SEI metadata
+                logger.info(f"🤖 gpt-realtime said: {transcript}")
+                # Publish gpt-realtime response as SEI metadata
                 await self._publish_transcript_sei("assistant", transcript)
 
         elif message_type == "conversation.item.input_audio_transcription.completed":
@@ -336,7 +336,7 @@ class OpenAIRealtimeManager:
         elif message_type == "input_audio_buffer.speech_started":
             logger.info("🗣️ Speech started detected")
             # Stop any current audio output to allow for interruption
-            await self.openai_audio_track.stop_current_audio()
+            await self.gpt_realtime_audio_track.stop_current_audio()
 
         elif message_type == "input_audio_buffer.speech_stopped":
             logger.info("🤐 Speech stopped detected")
@@ -361,12 +361,12 @@ class OpenAIRealtimeManager:
                     # Execute the function call
                     result = await self._execute_function_call(function_name, arguments)
 
-                    # Send function call result back to OpenAI
+                    # Send function call result back to gpt-realtime
                     await self._send_function_result(call_id, result)
 
         elif message_type == "error":
             error = data.get("error", {})
-            logger.error(f"❌ OpenAI API error: {error.get('message', 'Unknown error')}")
+            logger.error(f"❌ gpt-realtime API error: {error.get('message', 'Unknown error')}")
 
         elif message_type == "response.function_call_arguments.delta":
             # Handle function call arguments streaming
@@ -390,7 +390,7 @@ class OpenAIRealtimeManager:
                     await self._publish_transcript_sei("user", transcript)
 
     async def _send_audio_chunks(self):
-        """Send audio chunks to OpenAI real-time API"""
+        """Send audio chunks to gpt-realtime API"""
         try:
             while self.connected:
                 try:
@@ -468,7 +468,7 @@ class OpenAIRealtimeManager:
             return {"error": str(e)}
 
     async def _send_function_result(self, call_id: str, result: Dict[str, Any]):
-        """Send function call result back to OpenAI"""
+        """Send function call result back to gpt-realtime"""
         try:
             if self.connected and self.websocket:
                 # Send the function result
@@ -588,9 +588,9 @@ class OpenAIRealtimeManager:
             logger.error(f"❌ Error publishing transcript SEI: {e}")
 
     async def close(self):
-        """Close the OpenAI real-time API connection"""
+        """Close the gpt-realtime API connection"""
         try:
-            logger.info("🔌 Closing OpenAI real-time API connection...")
+            logger.info("🔌 Closing gpt-realtime API connection...")
 
             self.connected = False
 
@@ -618,7 +618,7 @@ class OpenAIRealtimeManager:
                 await self.websocket.close()
                 self.websocket = None
 
-            logger.info("✅ OpenAI real-time API connection closed")
+            logger.info("✅ gpt-realtime API connection closed")
 
         except Exception as e:
-            logger.error(f"❌ Error closing OpenAI connection: {e}")
+            logger.error(f"❌ Error closing gpt-realtime connection: {e}")
