@@ -22,12 +22,11 @@ The OpenAI Assistant Manager is a WebSocket-based service that:
                                                     │
                                                     │ Spawns
                                                     ▼
-                                     ┌──────────────────────────┐
-                                     │  OpenAI Real-time        │
-                                     │  Assistant Instances     │
-                                     │  (ivs-stage-gpt-realtime      │
-                                     │   realtime.py)           │
-                                     └──────────────────────────┘
+                                     ┌──────────────────────────────┐
+                                     │  OpenAI Real-time            │
+                                     │  Assistant Instances         │
+                                     │  (ivs-stage-gpt-realtime.py) │
+                                     └──────────────────────────────┘
                                                     │
                                                     │ Connects to
                                                     ▼
