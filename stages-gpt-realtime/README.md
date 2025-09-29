@@ -7,6 +7,7 @@ This module provides speech-to-speech conversation capabilities using OpenAI's `
 - Subscribe to IVS stage participants for audio input
 - Process audio through OpenAI's `gpt-realtime` API for speech-to-speech conversations
 - Publish AI responses back to the IVS stage
+- **SEI metadata publishing**: Real-time transcript publishing via H.264 SEI for both user input and AI responses
 - WebSocket-based real-time communication with OpenAI
 - **Vision capabilities**: AI-powered video frame analysis using OpenAI's native image processing
 - **Function calling**: for vision and other capabilities
@@ -62,6 +63,38 @@ The agent will automatically use the `analyze_frame` function to capture and ana
 - **Natural conversation**: Refers to the user as "you" in a conversational manner
 - **Detailed descriptions**: Provides comprehensive analysis of people, objects, activities, and environment
 - **Integrated processing**: Uses the same OpenAI model for both audio and visual understanding
+
+## SEI Transcript Publishing
+
+The OpenAI agent automatically publishes real-time transcripts as H.264 SEI (Supplemental Enhancement Information) metadata embedded in the video stream. This enables downstream applications to access both user input and AI response transcripts in real-time.
+
+### SEI Features
+
+- **Real-time transcript delivery**: Transcripts are published as they become available
+- **Bidirectional transcription**: Captures both user speech and AI responses
+- **H.264 SEI embedding**: Transcripts are embedded directly in the video stream metadata
+- **JSON format**: Structured data with role, content, and timestamp information
+- **Automatic retry**: Built-in retry mechanism for reliable delivery
+
+### SEI Message Format
+
+```json
+{
+  "type": "openai_text_output",
+  "role": "user|assistant",
+  "content": "Transcript text content",
+  "timestamp": 1234567890.123
+}
+```
+
+### Integration Examples
+
+SEI metadata can be extracted by video players, streaming applications, or custom decoders to provide:
+
+- **Live captions**: Real-time subtitles for accessibility
+- **Conversation logging**: Persistent transcript storage
+- **Content analysis**: Real-time processing of conversation content
+- **Multi-language support**: Transcript translation and localization
 
 ## Voice Activity Detection (VAD)
 
@@ -143,18 +176,18 @@ For automated management of multiple OpenAI assistant instances via WebSocket in
 
 This companion tool allows you to dynamically launch and manage multiple OpenAI real-time instances based on chat messages, perfect for scaling AI assistants across multiple participants with full configuration control.
 
-### Important Limitation: Semantic VAD and Transcriptions
+### Important Limitation: Semantic VAD and SEI Transcriptions
 
 ⚠️ **Known Issue**: When using `semantic_vad` mode, user input transcriptions may not be generated or published as SEI metadata, regardless of the `eagerness` setting. This appears to be a platform limitation where OpenAI's semantic VAD does not consistently trigger the `conversation.item.input_audio_transcription.completed` events.
 
-**Impact:**
+**Impact on SEI Publishing:**
 
 - User speech is detected and processed for AI responses
-- AI responses are transcribed and published as SEI metadata
-- **User transcriptions are missing** from logs and SEI metadata
+- AI responses are transcribed and published as SEI metadata normally
+- **User transcriptions are missing** from logs and SEI metadata stream
 
 **Workaround:**
-If you need reliable user transcriptions for logging, SEI metadata, or debugging purposes, use `server_vad` mode instead:
+If you need reliable user transcriptions for logging, SEI metadata publishing, or debugging purposes, use `server_vad` mode instead:
 
 ```bash
 # Recommended for reliable transcriptions
@@ -163,5 +196,5 @@ If you need reliable user transcriptions for logging, SEI metadata, or debugging
 
 **When to use each mode:**
 
-- **Server VAD**: Choose this if you need user transcriptions or predictable behavior
-- **Semantic VAD**: Choose this for the most natural conversation flow, but accept that user transcriptions may be missing
+- **Server VAD**: Choose this if you need reliable SEI transcript publishing, user transcriptions, or predictable behavior
+- **Semantic VAD**: Choose this for the most natural conversation flow, but accept that user transcriptions may be missing from SEI metadata
