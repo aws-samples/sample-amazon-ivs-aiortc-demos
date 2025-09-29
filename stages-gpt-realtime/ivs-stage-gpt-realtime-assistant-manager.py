@@ -125,14 +125,6 @@ class IVSStageGptRealtimeAssistantManager:
                 if config.get("disableFrameAnalysis", False):
                     cmd.append("--disable-frame-analysis")
 
-                bedrock_model = config.get("bedrockModelId")
-                if bedrock_model:
-                    cmd.extend(["--bedrock-model-id", bedrock_model])
-
-                bedrock_region = config.get("bedrockRegion")
-                if bedrock_region:
-                    cmd.extend(["--bedrock-region", bedrock_region])
-
             logger.info(f"🚀 Launching gpt-realtime instance for participant {participant_id}")
             logger.debug(f"Command: {' '.join(cmd)}")
 

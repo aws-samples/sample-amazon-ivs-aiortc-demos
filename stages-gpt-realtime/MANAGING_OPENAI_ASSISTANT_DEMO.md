@@ -10,7 +10,7 @@ The OpenAI Assistant Manager is a WebSocket-based service that:
 - **Automatically launches OpenAI real-time assistants** when requested
 - **Manages multiple concurrent instances** with configurable limits
 - **Handles cleanup and monitoring** of spawned processes
-- **Supports full OpenAI configuration** including voice, VAD settings, and vision capabilities
+- **Supports full OpenAI configuration** including voice, VAD settings, and native vision capabilities
 
 ## Architecture
 
@@ -43,7 +43,6 @@ The OpenAI Assistant Manager is a WebSocket-based service that:
 1. **Amazon IVS Chat Room** - For WebSocket messaging
 2. **Amazon IVS Real-Time Stage** - For video/audio streaming
 3. **OpenAI API Access** - With real-time API capabilities
-4. **AWS Credentials** - With appropriate permissions
 
 ### AWS Permissions
 
@@ -56,11 +55,6 @@ Your AWS credentials need:
     {
       "Effect": "Allow",
       "Action": ["ivschat:CreateChatToken", "ivs-realtime:CreateParticipantToken"],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["bedrock-runtime:InvokeModel"],
       "Resource": "*"
     }
   ]
@@ -125,9 +119,7 @@ Send this JSON message through IVS Chat to launch a gpt-realtime assistant:
   "vadMode": "server_vad",
   "vadThreshold": 0.5,
   "vadEagerness": "medium",
-  "disableFrameAnalysis": false,
-  "bedrockModelId": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-  "bedrockRegion": "us-east-1"
+  "disableFrameAnalysis": false
 }
 ```
 
@@ -166,11 +158,7 @@ Send this JSON message through IVS Chat to launch a gpt-realtime assistant:
 #### Vision/Analysis Options
 
 - **`disableFrameAnalysis`**: Disable video frame analysis
-  - Default: `false`
-- **`bedrockModelId`**: Claude model for frame analysis
-  - Default: `"us.anthropic.claude-sonnet-4-20250514-v1:0"`
-- **`bedrockRegion`**: AWS region for Bedrock
-  - Default: `"us-east-1"`
+  - Default: `false` (uses OpenAI's native image processing)
 
 ## Example Configurations
 
@@ -363,7 +351,7 @@ launch_gpt_realtime_assistant(
 
 1. **Set appropriate max instances** based on your server capacity
 2. **Use server VAD** if you need reliable transcriptions
-3. **Disable frame analysis** if vision capabilities aren't needed
+3. **Disable frame analysis** if OpenAI vision capabilities aren't needed
 4. **Monitor resource usage** with verbose logging
 
 ### Security
@@ -436,19 +424,19 @@ Monitor system resources:
 
 ## Conclusion
 
-The Gpt Realtime Assistant Manager provides a powerful way to dynamically manage multiple Gpt Realtime real-time assistants through simple WebSocket messages. It handles the complexity of:
+The OpenAI Realtime Assistant Manager provides a powerful way to dynamically manage multiple OpenAI real-time assistants through simple WebSocket messages. It handles the complexity of:
 
 - **Token management** for both IVS Chat and Real-Time Stages
 - **Process lifecycle** management with monitoring and cleanup
-- **Configuration flexibility** with full Gpt Realtime parameter support
+- **Configuration flexibility** with full OpenAI parameter support
 - **Error handling** with detailed feedback
 - **Resource management** with configurable limits
 
-This enables building scalable, interactive applications where Gpt Realtime assistants can be launched on-demand for any participant in an IVS stage, with full control over voice, VAD settings, and vision capabilities.
+This enables building scalable, interactive applications where OpenAI assistants can be launched on-demand for any participant in an IVS stage, with full control over voice, VAD settings, and native vision capabilities.
 
 ## Related Documentation
 
-- [Gpt Realtime API Integration](README.md)
+- [OpenAI Realtime API Integration](README.md)
 - [Nova S2S Assistant Manager](../stages-nova-s2s/MANAGING_ASSISTANT_DEMO.md)
 - [IVS Real-Time Stages Documentation](https://docs.aws.amazon.com/ivs/latest/RealTimeUserGuide/)
-- [Gpt Realtime API Documentation](https://platform.openai.com/docs/guides/realtime)
+- [OpenAI Realtime API Documentation](https://platform.openai.com/docs/guides/realtime)

@@ -4,7 +4,6 @@ import logging
 import base64
 import websockets
 import time
-import boto3
 import av
 from PIL import Image
 import io
@@ -32,8 +31,6 @@ class GptRealtimeManager:
         model: str = "gpt-realtime",
         voice: str = "cedar",
         enable_frame_analysis: bool = True,
-        analysis_model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0",
-        analysis_region: str = "us-east-1",
         vad_mode: str = "server_vad",
         vad_threshold: float = 0.5,
         vad_prefix_padding_ms: int = 300,
@@ -48,8 +45,6 @@ class GptRealtimeManager:
 
         # Frame analysis configuration
         self.enable_frame_analysis = enable_frame_analysis
-        self.analysis_model_id = analysis_model_id
-        self.analysis_region = analysis_region
 
         # VAD configuration
         self.vad_mode = vad_mode
@@ -83,14 +78,8 @@ class GptRealtimeManager:
         # Frame analysis setup
         self.frame = None  # Current video frame for analysis
         if self.enable_frame_analysis:
-            try:
-                self.bedrock_client = boto3.client("bedrock-runtime", region_name=self.analysis_region)
-                logger.info(f"🔍 Frame analysis enabled - model: {self.analysis_model_id}, region: {self.analysis_region}")
-            except Exception as e:
-                logger.error(f"❌ Failed to initialize Bedrock client: {e}")
-                self.enable_frame_analysis = False
+            logger.info("🔍 Frame analysis enabled - using OpenAI native image processing")
         else:
-            self.bedrock_client = None
             logger.info("🔍 Frame analysis disabled")
 
         # SEI Publisher for metadata transmission
@@ -134,7 +123,8 @@ class GptRealtimeManager:
                     "instructions": (
                         "You are a helpful AI assistant participating in a live video conversation. "
                         "Keep your responses conversational and natural. "
-                        "Respond to what the user says in a friendly and engaging way."
+                        "Respond to what the user says in a friendly and engaging way. "
+                        "When users ask about what you can see or about their appearance, use the analyze_frame function to look at their video feed."
                     ),
                     "voice": self.voice,
                     "input_audio_format": "pcm16",
@@ -488,7 +478,7 @@ class GptRealtimeManager:
             logger.error(f"❌ Error sending function result: {e}")
 
     async def _analyze_current_frame(self, prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Analyze the current video frame using Bedrock"""
+        """Analyze the current video frame using OpenAI's native image processing"""
         try:
             if not self.enable_frame_analysis:
                 return {"error": "Frame analysis is disabled"}
@@ -496,7 +486,7 @@ class GptRealtimeManager:
             if self.frame is None:
                 return {"error": "No video frame available for analysis"}
 
-            logger.info("🔍 Starting frame analysis...")
+            logger.info("🔍 Starting frame analysis with OpenAI native image processing...")
 
             # Convert frame to base64 in a thread pool to avoid blocking
             loop = asyncio.get_event_loop()
@@ -505,39 +495,44 @@ class GptRealtimeManager:
             if not frame_base64:
                 return {"error": "Failed to convert frame to base64"}
 
-            # Prepare the message for Claude
-            bedrock_prompt = "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. Refer to subjects in the image as 'you' and say things like 'your' or 'you are' instead of talking about the subject in the third-person. Pretend like you know them personally and are responding directly to them conversationally."
-            if prompt:
-                bedrock_prompt += f" The user has specifically asked: '{prompt}'"
-
-            message = {
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": frame_base64}},
-                    {
-                        "type": "text",
-                        "text": bedrock_prompt,
-                    },
-                ],
+            # Send image to OpenAI using the conversation.item.create message
+            # This adds the image to the conversation context
+            image_message = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_image", "image_url": f"data:image/jpeg;base64,{frame_base64}"}],
+                },
             }
 
-            # Call Bedrock in a thread pool
-            def bedrock_call():
-                return self.bedrock_client.invoke_model(
-                    modelId=self.analysis_model_id,
-                    body=json.dumps({"anthropic_version": "bedrock-2023-05-31", "max_tokens": 200, "messages": [message], "temperature": 0.4}),
-                )
+            # Send the image to the conversation
+            if self.connected and self.websocket:
+                await self.websocket.send(json.dumps(image_message))
+                logger.info("📸 Sent image to OpenAI conversation")
 
-            response = await asyncio.wait_for(loop.run_in_executor(None, bedrock_call), timeout=20)
+            # Prepare analysis prompt
+            analysis_prompt = "Analyze this video frame from a live stream. Describe what you see in detail, including people, objects, activities, text, and any notable features. Refer to subjects in the image as 'you' and say things like 'your' or 'you are' instead of talking about the subject in the third-person. Pretend like you know them personally and are responding directly to them conversationally."
+            if prompt:
+                analysis_prompt += f" The user has specifically asked: '{prompt}'"
 
-            # Parse response
-            response_body = json.loads(response["body"].read())
-            analysis_result = response_body["content"][0]["text"]
+            # Send text prompt asking for analysis
+            text_message = {
+                "type": "conversation.item.create",
+                "item": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": analysis_prompt}]},
+            }
 
-            logger.info("✅ Frame analysis completed")
-            logger.info(f"📝 Analysis: {analysis_result}")
+            if self.connected and self.websocket:
+                await self.websocket.send(json.dumps(text_message))
+                logger.info("📝 Sent analysis prompt to OpenAI")
 
-            return {"analysis": analysis_result}
+                # Trigger response generation
+                response_message = {"type": "response.create"}
+                await self.websocket.send(json.dumps(response_message))
+                logger.info("🤖 Triggered OpenAI response for image analysis")
+
+            logger.info("✅ Frame analysis request sent to OpenAI")
+            return {"analysis": "Image analysis request sent to OpenAI. The response will be provided through the normal conversation flow."}
 
         except asyncio.TimeoutError:
             logger.error("Frame analysis timed out")

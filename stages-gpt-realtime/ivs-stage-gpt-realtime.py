@@ -464,17 +464,6 @@ def parse_args():
         action="store_true",
         help="Disable video frame analysis (default: enabled)",
     )
-    parser.add_argument(
-        "--bedrock-region",
-        default="us-east-1",
-        help="AWS region for Bedrock service (default: us-east-1)",
-    )
-    parser.add_argument(
-        "--bedrock-model-id",
-        default="us.anthropic.claude-sonnet-4-20250514-v1:0",
-        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
-    )
-
     # VAD (Voice Activity Detection) options
     parser.add_argument(
         "--vad-mode",
@@ -533,8 +522,7 @@ async def main():
     logger.info(f"🗣️ Voice: {args.voice}")
     logger.info(f"🔍 Frame analysis: {'enabled' if not args.disable_frame_analysis else 'disabled'}")
     if not args.disable_frame_analysis:
-        logger.info(f"🧠 Analysis model: {args.bedrock_model_id}")
-        logger.info(f"🌍 Analysis region: {args.bedrock_region}")
+        logger.info("🧠 Using OpenAI native image processing")
 
     logger.info(f"🎤 VAD mode: {args.vad_mode}")
     if args.vad_mode == "server_vad":
@@ -595,8 +583,6 @@ async def main():
             model=args.model,
             voice=args.voice,
             enable_frame_analysis=not args.disable_frame_analysis,
-            analysis_model_id=args.bedrock_model_id,
-            analysis_region=args.bedrock_region,
             vad_mode=args.vad_mode,
             vad_threshold=args.vad_threshold,
             vad_prefix_padding_ms=args.vad_prefix_padding_ms,

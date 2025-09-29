@@ -8,7 +8,7 @@ This module provides speech-to-speech conversation capabilities using OpenAI's `
 - Process audio through OpenAI's `gpt-realtime` API for speech-to-speech conversations
 - Publish AI responses back to the IVS stage
 - WebSocket-based real-time communication with OpenAI
-- **Vision capabilities**: AI-powered video frame analysis using Amazon Bedrock Claude models
+- **Vision capabilities**: AI-powered video frame analysis using OpenAI's native image processing
 - **Function calling**: for vision and other capabilities
 - Real-time audio visualization with OpenAI branding
 - Voice activity detection and interruption handling
@@ -18,7 +18,6 @@ This module provides speech-to-speech conversation capabilities using OpenAI's `
 
 - OpenAI API key with real-time API access
 - IVS stage token with both subscribe and publish capabilities
-- AWS credentials with Bedrock access (for vision capabilities)
 - Python 3.8+
 
 ## Usage
@@ -35,8 +34,6 @@ python ivs-stage-gpt-realtime.py --token <IVS_TOKEN> --subscribe-to <PARTICIPANT
 - `--model`: OpenAI model to use (default: gpt-realtime)
 - `--voice`: Voice to use for responses (default: cedar. options: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar)
 - `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
-- `--bedrock-region`: AWS region for Bedrock service (default: us-east-1)
-- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)
 - `--vad-mode`: VAD mode - server_vad (silence-based) or semantic_vad (context-aware, default: server_vad)
 - `--vad-threshold`: VAD sensitivity threshold for server_vad, 0.0-1.0, lower = more sensitive (default: 0.5)
 - `--vad-prefix-padding-ms`: Audio padding before speech detection for server_vad in milliseconds (default: 300)
@@ -47,9 +44,6 @@ python ivs-stage-gpt-realtime.py --token <IVS_TOKEN> --subscribe-to <PARTICIPANT
 ## Environment Variables
 
 - `OPENAI_API_KEY`: OpenAI API key (used if --openai-key not provided)
-- `AWS_REGION`: AWS region for Bedrock service
-- `AWS_ACCESS_KEY_ID`: AWS access key ID
-- `AWS_SECRET_ACCESS_KEY`: AWS secret access key
 
 ## Vision Capabilities
 
@@ -60,14 +54,14 @@ The OpenAI agent includes vision capabilities that allow it to see and describe 
 - "What's in my background?"
 - "Can you see me?"
 
-The agent will automatically use the `analyze_frame` function to capture and analyze the current video frame using Amazon Bedrock Claude models, then provide a detailed description of what it sees.
+The agent will automatically use the `analyze_frame` function to capture and analyze the current video frame using OpenAI's native image processing capabilities, then provide a detailed description of what it sees.
 
 ### Vision Features
 
-- **Real-time frame analysis**: Analyzes current video frames on demand
+- **Real-time frame analysis**: Analyzes current video frames on demand using OpenAI's native image processing
 - **Natural conversation**: Refers to the user as "you" in a conversational manner
 - **Detailed descriptions**: Provides comprehensive analysis of people, objects, activities, and environment
-- **Multiple Claude models**: Supports various Claude models for different use cases and cost optimization
+- **Integrated processing**: Uses the same OpenAI model for both audio and visual understanding
 
 ## Voice Activity Detection (VAD)
 
