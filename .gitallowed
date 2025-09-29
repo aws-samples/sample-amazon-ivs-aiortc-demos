@@ -1,0 +1,10 @@
+# Git secrets allowed patterns - false positives
+# OpenAI voice options that trigger false positives
+"sage"
+sage
+# Voice options in documentation
+Options:.*sage
+# Voice choices in code
+choices=.*sage
+# Voice validation lists
+voice.*sage
