@@ -11,9 +11,9 @@ This module provides speech-to-speech conversation capabilities using OpenAI's `
 - WebSocket-based real-time communication with OpenAI
 - **Vision capabilities**: AI-powered video frame analysis using OpenAI's native image processing
 - **Function calling**: for vision and other capabilities
-- Real-time audio visualization with OpenAI branding
+- Real-time audio visualization
 - Voice activity detection and interruption handling
-- Multiple voice options (alloy, echo, fable, onyx, nova, shimmer)
+- Multiple voice options ("alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar")
 
 ## Requirements
 
