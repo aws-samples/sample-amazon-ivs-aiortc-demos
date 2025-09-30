@@ -1,4 +1,4 @@
-# IVS Stages OpenAI Real-time API Integration
+# IVS Stages OpenAI GPT Real-time API Integration
 
 This module provides speech-to-speech conversation capabilities using OpenAI's `gpt-realtime` API with Amazon IVS stages.
 
@@ -170,9 +170,9 @@ Context-aware detection that uses semantic understanding to determine when the u
 
 ## Assistant Management
 
-For automated management of multiple OpenAI assistant instances via WebSocket integration with IVS Chat, see:
+For automated management of multiple GPT Realtime assistant instances via WebSocket integration with IVS Chat, see:
 
-**[IVS Stage OpenAI Assistant Manager Documentation](MANAGING_OPENAI_ASSISTANT_DEMO.md)**
+**[IVS Stage GPT Realtime Assistant Manager Documentation](MANAGING_OPENAI_ASSISTANT_DEMO.md)**
 
 This companion tool allows you to dynamically launch and manage multiple OpenAI real-time instances based on chat messages, perfect for scaling AI assistants across multiple participants with full configuration control.
 
