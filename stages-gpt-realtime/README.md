@@ -174,7 +174,7 @@ For automated management of multiple GPT Realtime assistant instances via WebSoc
 
 **[IVS Stage GPT Realtime Assistant Manager Documentation](MANAGING_OPENAI_ASSISTANT_DEMO.md)**
 
-This companion tool allows you to dynamically launch and manage multiple OpenAI real-time instances based on chat messages, perfect for scaling AI assistants across multiple participants with full configuration control.
+This companion tool allows you to dynamically launch and manage multiple OpenAI real-time instances based on WebSocket messages, perfect for scaling AI assistants across multiple participants with full configuration control.
 
 ### Important Limitation: Semantic VAD and SEI Transcriptions
 
