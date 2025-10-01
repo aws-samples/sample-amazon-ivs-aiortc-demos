@@ -8,9 +8,97 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import stages_sei.h264_sei_patch
 import stages_sei.h264_sei_decoder_patch
 from stages_sei import SeiSubscriber, log_sei_message, set_global_sei_subscriber
+from stages_sei.sei_subscriber import ReceivedSeiMessage
 
 # Global SEI subscriber for packet interception
 global_sei_subscriber = None
+global_gpt_manager = None
+
+
+def handle_received_sei_message(sei_message: ReceivedSeiMessage):
+    """
+    Handle received SEI messages from the video stream.
+
+    Args:
+        sei_message: The received SEI message object
+    """
+    global global_gpt_manager
+
+    try:
+        # Parse the message payload
+        message_data = sei_message.to_dict()
+        payload = message_data.get("payload", {})
+
+        # Log the received message
+        logger.info(f"📡 Received SEI message: {payload}")
+
+        # Handle different types of SEI messages
+        if isinstance(payload, dict):
+            # Check for specific message types
+            message_type = payload.get("type")
+            sender = payload.get("sender", "unknown")
+            content = payload.get("content") or payload.get("message")
+
+            if message_type == "chat":
+                logger.info(f"💬 Chat message from {sender}: {content}")
+                # Could potentially add to conversation context
+            elif message_type == "user_input":
+                logger.info(f"🎤 User input from {sender}: {content}")
+                # Could potentially inject as user message
+            elif message_type == "assistant_response":
+                logger.info(f"🤖 Assistant response from {sender}: {content}")
+                # Could display or log assistant responses from other participants
+            elif message_type == "system":
+                logger.info(f"⚙️ System message from {sender}: {content}")
+                # Handle system notifications
+            elif message_type == "metadata":
+                # Handle metadata messages (participant info, etc.)
+                logger.info(f"📊 Metadata from {sender}: {content or payload}")
+            elif message_type == "command":
+                # Handle command messages (e.g., mute, unmute, etc.)
+                command = payload.get("command")
+                logger.info(f"🎮 Command from {sender}: {command}")
+                handle_sei_command(command, payload)
+            else:
+                # Handle generic messages or unknown formats
+                if content:
+                    logger.info(f"📝 Message from {sender}: {content}")
+                else:
+                    logger.info(f"📦 Data from {sender}: {payload}")
+        else:
+            # Handle non-dict payloads (strings, etc.)
+            logger.info(f"📄 Raw SEI message: {payload}")
+    except Exception as e:
+        logger.error(f"❌ Error handling SEI message: {e}")
+        logger.debug(f"SEI message data: {sei_message.to_dict()}")
+
+
+def handle_sei_command(command: str, payload: dict):
+    """
+    Handle SEI command messages.
+
+    Args:
+        command: The command string
+        payload: The full message payload
+    """
+    try:
+        if command == "mute":
+            logger.info("🔇 Received mute command via SEI")
+            # Could integrate with audio track muting here
+        elif command == "unmute":
+            logger.info("🔊 Received unmute command via SEI")
+            # Could integrate with audio track unmuting here
+        elif command == "ping":
+            logger.info("🏓 Received ping command via SEI")
+            # Could send a pong response back
+        elif command == "status_request":
+            logger.info("📊 Received status request via SEI")
+            # Could send back system status
+        else:
+            logger.info(f"❓ Unknown SEI command: {command}")
+
+    except Exception as e:
+        logger.error(f"❌ Error handling SEI command '{command}': {e}")
 
 
 def setup_global_sei_hooks():
@@ -385,7 +473,7 @@ async def subscribe_to_participant(
     # SEI subscriber for extracting metadata from video (if enabled)
     sei_subscriber = None
     if enable_sei_subscription:
-        sei_subscriber = SeiSubscriber(message_callback=log_sei_message)
+        sei_subscriber = SeiSubscriber(message_callback=handle_received_sei_message)
         logger.info("📡 SEI subscriber initialized for incoming video metadata")
 
         # Set up global decoder patch for SEI extraction
@@ -713,6 +801,10 @@ async def main():
             vad_eagerness=args.vad_eagerness,
         )
         await gpt_realtime_realtime_manager.initialize()
+
+        # Set global reference for SEI message handling
+        global global_gpt_manager
+        global_gpt_manager = gpt_realtime_realtime_manager
 
         # Start subscribing to participants if specified
         if args.subscribe_to:

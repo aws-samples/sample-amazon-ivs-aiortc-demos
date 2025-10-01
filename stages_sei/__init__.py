@@ -16,21 +16,36 @@ SEI Message Identification:
 
 Usage:
     from stages_sei import SeiPublisher, patch_h264_encoder
-    
+
     # Initialize SEI publisher
     sei_publisher = SeiPublisher()
-    
+
     # Apply H.264 encoder patch
     patch_h264_encoder()
-    
+
     # Publish SEI messages
     await sei_publisher.publish_json({"type": "metadata", "content": "Hello"})
 """
 
 from .sei_publisher import SeiPublisher, SeiMessage
+from .sei_subscriber import SeiSubscriber, ReceivedSeiMessage, log_sei_message, test_sei_extraction
 from .h264_sei_patch import patch_h264_encoder, set_global_sei_publisher, get_global_sei_publisher
+from .h264_sei_decoder_patch import patch_h264_decoder, set_global_sei_subscriber, get_global_sei_subscriber
 
 __version__ = "1.0.0"
 __author__ = "Amazon IVS Team"
 
-__all__ = ["SeiPublisher", "SeiMessage", "patch_h264_encoder", "set_global_sei_publisher", "get_global_sei_publisher"]
+__all__ = [
+    "SeiPublisher",
+    "SeiMessage",
+    "SeiSubscriber",
+    "ReceivedSeiMessage",
+    "log_sei_message",
+    "test_sei_extraction",
+    "patch_h264_encoder",
+    "patch_h264_decoder",
+    "set_global_sei_publisher",
+    "get_global_sei_publisher",
+    "set_global_sei_subscriber",
+    "get_global_sei_subscriber",
+]

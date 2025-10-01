@@ -56,8 +56,8 @@ def create_h264_sei_nal_unit(payload: bytes) -> bytes:
     Format: [start_code][NAL_header][SEI_type][SEI_size][UUID][payload][rbsp_trailing_bits]
     """
     try:
-        # UUID for user data unregistered (16 bytes) - Custom UUID: b16d7d56-892e-419c-8d82-e069cd3aa5c1
-        uuid = bytes([0xB1, 0x6D, 0x7D, 0x56, 0x89, 0x2E, 0x41, 0x9C, 0x8D, 0x82, 0xE0, 0x69, 0xCD, 0x3A, 0xA5, 0xC1])
+        # UUID for user data unregistered (16 bytes) - Amazon IVS UUID: [158, 80, 78, 165, 238, 90, 79, 2, 148, 159, 176, 51, 163, 118, 141, 162]
+        uuid = bytes([158, 80, 78, 165, 238, 90, 79, 2, 148, 159, 176, 51, 163, 118, 141, 162])
         # SEI payload type 5 = user_data_unregistered (H.264 spec D.1.5)
         sei_type = 5
 

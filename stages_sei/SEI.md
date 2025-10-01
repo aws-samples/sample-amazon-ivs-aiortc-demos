@@ -10,20 +10,21 @@ SEI (Supplemental Enhancement Information) is part of the H.264/AVC video compre
 
 ### Key Benefits:
 
--   **Perfect Synchronization**: Metadata is embedded directly in video frames
--   **Low Latency**: No separate data channels needed
--   **Standards Compliant**: Uses official H.264 specification
--   **Cross-Platform**: Works with any H.264-compatible decoder
--   **Reliable Delivery**: Metadata survives video transcoding and streaming
+- **Perfect Synchronization**: Metadata is embedded directly in video frames
+- **Low Latency**: No separate data channels needed
+- **Standards Compliant**: Uses official H.264 specification
+- **Cross-Platform**: Works with any H.264-compatible decoder
+- **Reliable Delivery**: Metadata survives video transcoding and streaming
 
 ## 📁 Components
 
 ### Core Files:
 
--   **`sei_publisher.py`** - High-level SEI message publishing interface
--   **`h264_sei_patch.py`** - Low-level H.264 encoder patching system
--   **`SEI.md`** - This documentation file
--   **`__init__.py`** - Python package initialization
+- **`sei_publisher.py`** - High-level SEI message publishing interface
+- **`sei_subscriber.py`** - High-level SEI message subscription/extraction interface
+- **`h264_sei_patch.py`** - Low-level H.264 encoder patching system
+- **`SEI.md`** - This documentation file
+- **`__init__.py`** - Python package initialization
 
 ## 🚀 Quick Start
 
@@ -31,17 +32,20 @@ SEI (Supplemental Enhancement Information) is part of the H.264/AVC video compre
 
 ```python
 import asyncio
-from stages_sei import SeiPublisher, patch_h264_encoder, set_global_sei_publisher
+from stages_sei import SeiPublisher, SeiSubscriber, patch_h264_encoder, set_global_sei_publisher, log_sei_message
 
 # Apply H.264 encoder patch (do this early in your application)
 patch_result = patch_h264_encoder()
 print(f"H.264 patch applied: {patch_result}")
 
-# Create SEI publisher
+# Create SEI publisher for sending messages
 sei_publisher = SeiPublisher()
 
 # Connect the publisher to the H.264 patch
 set_global_sei_publisher(sei_publisher)
+
+# Create SEI subscriber for receiving messages
+sei_subscriber = SeiSubscriber(message_callback=log_sei_message)
 ```
 
 ### 2. Publishing SEI Messages
@@ -60,13 +64,38 @@ metadata = {
 await sei_publisher.publish_json(metadata, repeat_count=3)
 ```
 
-### 3. Integration with Video Streams
+### 3. Receiving SEI Messages
+
+```python
+# Process video frames to extract SEI messages
+async def process_video_frame(frame):
+    sei_messages = await sei_subscriber.process_frame(frame)
+    for message in sei_messages:
+        print(f"Received SEI: {message.to_dict()}")
+
+# Process raw packet data
+async def process_packet_data(packet_data):
+    sei_messages = await sei_subscriber.process_packet_data(packet_data)
+    for message in sei_messages:
+        print(f"Received SEI: {message.to_dict()}")
+
+# Custom message callback
+def custom_sei_callback(message):
+    payload_dict = message.to_dict()
+    if isinstance(payload_dict['payload'], dict):
+        msg_type = payload_dict['payload'].get('type', 'unknown')
+        print(f"SEI Message Type: {msg_type}")
+
+sei_subscriber.set_message_callback(custom_sei_callback)
+```
+
+### 4. Integration with Video Streams
 
 The SEI system automatically intercepts H.264 video data from:
 
--   **aiortc** H.264 encoders (`_encode_frame` method)
--   **PyAV** packet conversion methods (`__bytes__`, `to_bytes`)
--   Multiple H.264 formats: Annex B, AVCC, RTP payloads
+- **aiortc** H.264 encoders (`_encode_frame` method)
+- **PyAV** packet conversion methods (`__bytes__`, `to_bytes`)
+- Multiple H.264 formats: Annex B, AVCC, RTP payloads
 
 ## 🔧 Technical Details
 
@@ -87,19 +116,19 @@ The system automatically detects and handles multiple H.264 formats:
    3-4 bytes    1 byte      1 byte   1-N bytes  16 bytes   N bytes    1 byte
 ```
 
--   **Start Code**: `0x000001` (Annex B format)
--   **NAL Header**: `0x06` (SEI NAL unit type)
--   **SEI Type**: `0x05` (User Data Unregistered)
--   **UUID**: Custom identifier for message deduplication (`b16d7d56-892e-419c-8d82-e069cd3aa5c1`)
--   **Payload**: Your JSON/text data
--   **Trailing Bits**: RBSP alignment (`0x80`)
+- **Start Code**: `0x000001` (Annex B format)
+- **NAL Header**: `0x06` (SEI NAL unit type)
+- **SEI Type**: `0x05` (User Data Unregistered)
+- **UUID**: Custom identifier for message deduplication (`b16d7d56-892e-419c-8d82-e069cd3aa5c1`)
+- **Payload**: Your JSON/text data
+- **Trailing Bits**: RBSP alignment (`0x80`)
 
 ### Message Reliability
 
--   **Default Repeat Count**: 3x per message
--   **Automatic Deduplication**: Client-side based on timestamp
--   **Error Recovery**: Graceful fallback on encoding failures
--   **Size Limits**: Automatic truncation for large payloads
+- **Default Repeat Count**: 3x per message
+- **Automatic Deduplication**: Client-side based on timestamp
+- **Error Recovery**: Graceful fallback on encoding failures
+- **Size Limits**: Automatic truncation for large payloads
 
 ## 📊 Usage Patterns
 
@@ -150,6 +179,44 @@ async def publish_transcription(self, text: str, confidence: float):
         "timestamp": time.time()
     }
     await self.sei_publisher.publish_json(sei_data)
+```
+
+### SEI Message Reception
+
+```python
+class SeiMessageHandler:
+    def __init__(self):
+        self.sei_subscriber = SeiSubscriber(message_callback=self.handle_sei_message)
+
+    def handle_sei_message(self, message: ReceivedSeiMessage):
+        """Handle incoming SEI messages"""
+        payload_dict = message.to_dict()
+        payload_data = payload_dict['payload']
+
+        if isinstance(payload_data, dict):
+            msg_type = payload_data.get('type', 'unknown')
+
+            if msg_type == 'chat_message':
+                self.handle_chat_message(payload_data)
+            elif msg_type == 'ai_response':
+                self.handle_ai_response(payload_data)
+            elif msg_type == 'transcription':
+                self.handle_transcription(payload_data)
+
+    def handle_chat_message(self, data):
+        user = data.get('user', 'Unknown')
+        message = data.get('message', '')
+        print(f"Chat from {user}: {message}")
+
+    def handle_ai_response(self, data):
+        role = data.get('role', 'assistant')
+        content = data.get('content', '')
+        print(f"AI {role}: {content}")
+
+    def handle_transcription(self, data):
+        text = data.get('text', '')
+        confidence = data.get('confidence', 0.0)
+        print(f"Transcription ({confidence:.2f}): {text}")
 ```
 
 ## 🔍 Debugging & Monitoring
@@ -219,10 +286,10 @@ await sei_publisher.publish_json(custom_message)
 
 ### Dependencies:
 
--   `aiortc` - For WebRTC H.264 encoding
--   `av` (PyAV) - For video codec handling
--   `asyncio` - For async message handling
--   `json` - For payload serialization
+- `aiortc` - For WebRTC H.264 encoding
+- `av` (PyAV) - For video codec handling
+- `asyncio` - For async message handling
+- `json` - For payload serialization
 
 ### Import Updates:
 
@@ -241,15 +308,15 @@ from stages_sei import SeiPublisher, patch_h264_encoder, set_global_sei_publishe
 
 ### Throughput:
 
--   **Encoding Overhead**: ~1-2ms per SEI injection
--   **Payload Size**: Keep individual messages under 400 bytes
--   **Queue Management**: Process messages in batches for efficiency
+- **Encoding Overhead**: ~1-2ms per SEI injection
+- **Payload Size**: Keep individual messages under 400 bytes
+- **Queue Management**: Process messages in batches for efficiency
 
 ### Memory Usage:
 
--   **Message Queue**: Automatically cleared after processing
--   **Format Conversion**: Temporary buffers for format conversion
--   **Repeat Storage**: Each repeat creates a separate NAL unit
+- **Message Queue**: Automatically cleared after processing
+- **Format Conversion**: Temporary buffers for format conversion
+- **Repeat Storage**: Each repeat creates a separate NAL unit
 
 ## 🧪 Testing
 
@@ -280,23 +347,35 @@ assert result == True
 
 1. **SEI not appearing in stream**:
 
-    - Verify `patch_h264_encoder()` was called
-    - Check that `set_global_sei_publisher()` was called
-    - Ensure H.264 encoder is being used
+   - Verify `patch_h264_encoder()` was called
+   - Check that `set_global_sei_publisher()` was called
+   - Ensure H.264 encoder is being used
 
-2. **Messages not synchronized**:
+2. **SEI messages not being received**:
 
-    - SEI is embedded in video frames, sync depends on video timing
-    - Check that messages are published before/during video encoding
+   - Ensure video frames/packets contain encoded H.264 data
+   - Check that the subscriber is processing the correct video track
+   - Verify the sender is using the same UUID for SEI messages
+   - Enable debug logging to see extraction attempts
 
-3. **Large payload truncation**:
+3. **Messages not synchronized**:
 
-    - Keep individual messages under 400 bytes
-    - Split large data into multiple messages
+   - SEI is embedded in video frames, sync depends on video timing
+   - Check that messages are published before/during video encoding
 
-4. **Performance issues**:
-    - Reduce repeat count for high-frequency messages
-    - Monitor queue size and clear if needed
+4. **Large payload truncation**:
+
+   - Keep individual messages under 400 bytes
+   - Split large data into multiple messages
+
+5. **Duplicate messages**:
+
+   - The subscriber automatically deduplicates based on timestamps
+   - Check message timestamps if duplicates are still appearing
+
+6. **Performance issues**:
+   - Reduce repeat count for high-frequency messages
+   - Monitor queue size and clear if needed
 
 ### Debug Mode:
 
@@ -307,11 +386,11 @@ logging.getLogger("stages_sei").setLevel(logging.DEBUG)
 
 ## 📚 References
 
--   [H.264/AVC Standard](https://www.itu.int/rec/T-REC-H.264)
--   [SEI NAL Unit Specification](https://www.itu.int/rec/T-REC-H.264-202108-I/en)
--   [WebRTC H.264 Implementation](https://webrtc.org/)
--   [PyAV Documentation](https://pyav.org/)
--   [aiortc Documentation](https://aiortc.readthedocs.io/)
+- [H.264/AVC Standard](https://www.itu.int/rec/T-REC-H.264)
+- [SEI NAL Unit Specification](https://www.itu.int/rec/T-REC-H.264-202108-I/en)
+- [WebRTC H.264 Implementation](https://webrtc.org/)
+- [PyAV Documentation](https://pyav.org/)
+- [aiortc Documentation](https://aiortc.readthedocs.io/)
 
 ---
 
