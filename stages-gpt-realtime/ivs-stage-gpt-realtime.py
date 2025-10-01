@@ -1,11 +1,80 @@
 #!/usr/bin/env python3
 
-# Apply H.264 SEI patch BEFORE importing aiortc
+# Apply H.264 SEI patches BEFORE importing aiortc
 import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 import stages_sei.h264_sei_patch
+import stages_sei.h264_sei_decoder_patch
+from stages_sei import SeiSubscriber, log_sei_message, set_global_sei_subscriber
+
+# Global SEI subscriber for packet interception
+global_sei_subscriber = None
+
+
+def setup_global_sei_hooks():
+    """Setup global hooks for SEI extraction at the PyAV level"""
+    global global_sei_subscriber
+
+    # Disable global hooks for now to avoid connection issues
+    logger.info("📡 Global SEI hooks disabled to prevent connection interference")
+    return False
+
+    if not global_sei_subscriber:
+        return
+
+    try:
+        import av
+
+        # Hook into PyAV Packet processing
+        if hasattr(av.Packet, "__bytes__"):
+            original_packet_bytes = av.Packet.__bytes__
+
+            def sei_aware_packet_bytes(self):
+                """Wrapper for Packet.__bytes__ that extracts SEI"""
+                packet_bytes = original_packet_bytes(self)
+
+                try:
+                    # Check if this looks like H.264 video data
+                    if len(packet_bytes) > 4:
+                        # Periodically log that we're intercepting packets
+                        import time
+
+                        current_time = time.time()
+                        if not hasattr(self, "_last_sei_log"):
+                            self._last_sei_log = 0
+
+                        if (current_time - self._last_sei_log) > 5.0:  # Log every 5 seconds
+                            self._last_sei_log = current_time
+                            logger.debug(f"📡 Global packet hook: processing {len(packet_bytes)} bytes")
+
+                        # Run SEI extraction asynchronously to avoid blocking
+                        import asyncio
+
+                        try:
+                            loop = asyncio.get_event_loop()
+                            if loop and not loop.is_closed():
+                                asyncio.create_task(global_sei_subscriber.process_packet_data(packet_bytes))
+                        except RuntimeError:
+                            # No event loop running, skip SEI extraction
+                            pass
+                except Exception as e:
+                    # Don't log here to avoid spam, just silently continue
+                    pass
+
+                return packet_bytes
+
+            av.Packet.__bytes__ = sei_aware_packet_bytes
+            logger.info("📡 Hooked into PyAV Packet.__bytes__ for global SEI extraction")
+            return True
+
+    except Exception as e:
+        logger.debug(f"Could not setup global SEI hooks: {e}")
+        return False
+
+    return False  # Default return if no hooks were installed
+
 
 import asyncio
 import json
@@ -64,6 +133,10 @@ gpt_realtime_audio_logger = logging.getLogger("gpt_realtime_audio_track")
 gpt_realtime_audio_logger.setLevel(logging.INFO)
 gpt_realtime_realtime_logger = logging.getLogger("gpt_realtime_realtime_manager")
 gpt_realtime_realtime_logger.setLevel(logging.INFO)
+sei_logger = logging.getLogger("stages_sei.sei_subscriber")
+sei_logger.setLevel(logging.DEBUG)
+patch_logger = logging.getLogger("stages_sei.h264_sei_decoder_patch")
+patch_logger.setLevel(logging.DEBUG)
 
 # Suppress noisy external loggers
 aiortc_logger = logging.getLogger("aiortc")
@@ -291,7 +364,9 @@ async def join_stage_as_publisher(token: str, gpt_realtime_audio_track: GptRealt
     return pc
 
 
-async def subscribe_to_participant(token: str, participant_id: str, gpt_realtime_realtime_manager: GptRealtimeManager):
+async def subscribe_to_participant(
+    token: str, participant_id: str, gpt_realtime_realtime_manager: GptRealtimeManager, enable_sei_subscription: bool = True
+):
     """Subscribe to a participant's audio/video streams and process audio through OpenAI"""
     logger.info(f"🎧 Subscribing to participant: {participant_id}")
 
@@ -306,6 +381,31 @@ async def subscribe_to_participant(token: str, participant_id: str, gpt_realtime
 
     # Audio processing state
     resampler = None
+
+    # SEI subscriber for extracting metadata from video (if enabled)
+    sei_subscriber = None
+    if enable_sei_subscription:
+        sei_subscriber = SeiSubscriber(message_callback=log_sei_message)
+        logger.info("📡 SEI subscriber initialized for incoming video metadata")
+
+        # Set up global decoder patch for SEI extraction
+        set_global_sei_subscriber(sei_subscriber)
+        logger.info("📡 Global SEI subscriber set for decoder patches")
+
+        # Set up additional global hooks for packet interception
+        global global_sei_subscriber
+        global_sei_subscriber = sei_subscriber
+        hook_success = setup_global_sei_hooks()
+        if hook_success:
+            logger.info("📡 Additional SEI packet hooks installed successfully")
+        else:
+            logger.debug("📡 Additional packet hooks not available (decoder patches should handle SEI extraction)")
+    else:
+        logger.info("📡 SEI subscription disabled")
+
+    # Disable complex packet hooks for now to avoid connection issues
+    if enable_sei_subscription and sei_subscriber:
+        logger.info("📡 SEI extraction will rely on frame-level processing (packet hooks disabled to prevent connection issues)")
 
     # Connection state tracking
     pc._should_exit = False
@@ -341,8 +441,9 @@ async def subscribe_to_participant(token: str, participant_id: str, gpt_realtime
             task = asyncio.create_task(process_audio_track(track))
             logger.info(f"Audio processing task created: {task}")
         elif track.kind == "video":
-            logger.info("🎥 Video track received - ignoring for now")
-            # Create a task for video processing (just consuming frames)
+            logger.info("🎥 Video track received - processing frames and SEI messages")
+
+            # Create a task for video processing (frames + SEI extraction)
             task = asyncio.create_task(process_video_track(track))
             logger.info(f"Video processing task created: {task}")
 
@@ -394,14 +495,25 @@ async def subscribe_to_participant(token: str, participant_id: str, gpt_realtime
 
     async def process_video_track(track: MediaStreamTrack):
         """Process video track in a separate async task"""
-        logger.info("🎬 Starting video processing task")
+        logger.info("🎬 Starting video processing task with SEI extraction")
         try:
             frame_count = 0
             while True:
                 frame = await track.recv()
                 frame_count += 1
+
                 # Set current frame for analysis
                 gpt_realtime_realtime_manager.set_current_frame(frame)
+
+                # Extract SEI messages from video frame (if enabled)
+                if sei_subscriber:
+                    try:
+                        sei_messages = await sei_subscriber.process_frame(frame)
+                        if sei_messages:
+                            logger.info(f"📡 Extracted {len(sei_messages)} SEI messages from frame {frame_count}")
+                    except Exception as sei_error:
+                        logger.debug(f"SEI extraction error on frame {frame_count}: {sei_error}")
+
         except Exception as e:
             logger.info(f"Video track ended for participant {participant_id}: {e}")
 
@@ -504,6 +616,13 @@ def parse_args():
         help="ICE gathering timeout in seconds (default: 1, original: 5)",
     )
 
+    # SEI options
+    parser.add_argument(
+        "--disable-sei-subscription",
+        action="store_true",
+        help="Disable SEI message subscription from incoming video (default: enabled)",
+    )
+
     return parser.parse_args()
 
 
@@ -523,6 +642,10 @@ async def main():
     logger.info(f"🔍 Frame analysis: {'enabled' if not args.disable_frame_analysis else 'disabled'}")
     if not args.disable_frame_analysis:
         logger.info("🧠 Using OpenAI native image processing")
+
+    logger.info(f"📡 SEI subscription: {'enabled' if not args.disable_sei_subscription else 'disabled'}")
+    if not args.disable_sei_subscription:
+        logger.info("📡 Will extract SEI messages from incoming video streams")
 
     logger.info(f"🎤 VAD mode: {args.vad_mode}")
     if args.vad_mode == "server_vad":
@@ -596,7 +719,9 @@ async def main():
             participant_id = args.subscribe_to
             logger.info(f"📥 Starting subscribe mode for participant: {participant_id}")
 
-            subscribe_pc = await subscribe_to_participant(args.token, participant_id, gpt_realtime_realtime_manager)
+            subscribe_pc = await subscribe_to_participant(
+                args.token, participant_id, gpt_realtime_realtime_manager, enable_sei_subscription=not args.disable_sei_subscription
+            )
 
             if subscribe_pc:
                 logger.info(f"✅ Successfully subscribed to {participant_id} with OpenAI processing")
