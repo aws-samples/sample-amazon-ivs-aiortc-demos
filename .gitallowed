@@ -2,9 +2,14 @@
 # OpenAI voice options that trigger false positives
 "sage" 
 sage
+"coral"
+coral
 # Voice options in documentation
 Options:.*sage
+Options:.*coral
 # Voice choices in code
 choices=.*sage
+choices=.*coral
 # Voice validation lists
 voice.*sage
+voice.*coral
