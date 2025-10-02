@@ -78,11 +78,11 @@ class GptRealtimeAudioTrack(AudioStreamTrack):
             # Get current batch buffer size for stats
             batch_buffer_size = len(self.batch_buffer)
 
-            logger.info(
-                f"📊 Gpt Realtime Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
-                f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
-                f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
-            )
+            # logger.info(
+            #     f"📊 Gpt Realtime Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
+            #     f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
+            #     f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
+            # )
 
     async def recv(self):
         """Generate and return audio frames from Gpt Realtime responses"""
