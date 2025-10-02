@@ -1,6 +1,6 @@
 # Git secrets allowed patterns - false positives
 # OpenAI voice options that trigger false positives
-"sage"
+"sage" 
 sage
 # Voice options in documentation
 Options:.*sage
