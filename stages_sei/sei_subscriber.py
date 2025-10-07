@@ -477,7 +477,7 @@ class SeiSubscriber:
 
                 # Check if this is our target SEI message
                 if self._is_target_sei_message(sei_payload):
-                    logger.info(f"📡 Found target SEI message with Amazon IVS UUID!")
+                    logger.debug(f"📡 Found target SEI message with Amazon IVS UUID!")
 
                     # Extract the actual payload (after UUID)
                     if len(sei_payload) > len(self.TARGET_SEI_UUID):
@@ -548,7 +548,7 @@ class SeiSubscriber:
 
             if nal_type == SEI_NAL_UNIT_TYPE:  # SEI NAL unit
                 sei_nal_count += 1
-                logger.info(f"📡 Found SEI NAL unit #{sei_nal_count} at position {pos}")
+                logger.debug(f"📡 Found SEI NAL unit #{sei_nal_count} at position {pos}")
 
                 # Find the end of this NAL unit
                 nal_end = self._sei_parser.find_next_start_code(annex_b_data, nal_start + 1)
@@ -562,7 +562,7 @@ class SeiSubscriber:
 
                 # Parse SEI message(s) within this NAL unit
                 sei_messages = self._sei_parser.parse_sei_messages(sei_data_clean)
-                logger.info(f"📡 Extracted {len(sei_messages)} SEI messages from NAL unit")
+                logger.debug(f"📡 Extracted {len(sei_messages)} SEI messages from NAL unit")
                 sei_payloads.extend(sei_messages)
 
                 pos = nal_end
@@ -571,7 +571,7 @@ class SeiSubscriber:
 
         # Only log if we found SEI messages
         if sei_nal_count > 0:
-            logger.info(f"📡 Found {sei_nal_count} SEI NAL units with {len(sei_payloads)} messages")
+            logger.debug(f"📡 Found {sei_nal_count} SEI NAL units with {len(sei_payloads)} messages")
 
         return sei_payloads
 

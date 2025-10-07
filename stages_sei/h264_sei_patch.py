@@ -17,7 +17,7 @@ def set_global_sei_publisher(sei_publisher):
     global _global_sei_publisher
     with _sei_lock:
         _global_sei_publisher = sei_publisher
-        logger.info("📡 Global SEI publisher set for H.264 encoder patch")
+        logger.debug("📡 Global SEI publisher set for H.264 encoder patch")
 
 
 def get_global_sei_publisher():
@@ -308,7 +308,7 @@ def inject_sei_into_bitstream(original_bitstream: bytes) -> bytes:
     if not messages_to_process:
         return original_bitstream
 
-    logger.info(f"📡 SEI INJECTION: Processing {len(messages_to_process)} messages into {format_type} bitstream")
+    logger.debug(f"📡 SEI INJECTION: Processing {len(messages_to_process)} messages into {format_type} bitstream")
 
     try:
         # Convert to Annex B format for processing
@@ -332,7 +332,7 @@ def inject_sei_into_bitstream(original_bitstream: bytes) -> bytes:
             # Convert back to original format
             final_data = convert_from_annex_b(modified_annex_b, format_type)
 
-            logger.info(f"📡 SEI INJECTION SUCCESS: {len(original_bitstream)} -> {len(final_data)} bytes ({format_type} format)")
+            logger.debug(f"📡 SEI INJECTION SUCCESS: {len(original_bitstream)} -> {len(final_data)} bytes ({format_type} format)")
             return final_data
 
     except Exception as e:
@@ -359,7 +359,7 @@ def patch_h264_encoder():
                     yield modified_chunk
 
             H264Encoder._encode_frame = patched_encode_frame
-            logger.info("✅ H.264 encoder._encode_frame successfully patched for SEI injection")
+            logger.debug("✅ H.264 encoder._encode_frame successfully patched for SEI injection")
             return True
 
     except Exception as e:
@@ -391,7 +391,7 @@ def patch_h264_encoder():
             # Note: This may fail due to immutable type, but we try anyway
             try:
                 av.CodecContext.encode = patched_av_encode
-                logger.info("✅ PyAV CodecContext.encode patched")
+                logger.debug("✅ PyAV CodecContext.encode patched")
             except TypeError:
                 pass  # Expected for immutable types
 
@@ -415,13 +415,13 @@ def patch_h264_encoder():
                     logger.debug(f"🎯 INTERCEPTED H.264 PACKET (__bytes__): {len(original_bytes)} bytes")
                     modified_bytes = inject_sei_into_bitstream(original_bytes)
                     if len(modified_bytes) != len(original_bytes):
-                        logger.info(f"📡 SEI injected into packet bytes: {len(original_bytes)} -> {len(modified_bytes)} bytes")
+                        logger.debug(f"📡 SEI injected into packet bytes: {len(original_bytes)} -> {len(modified_bytes)} bytes")
                         return modified_bytes
 
                 return original_bytes
 
             Packet.__bytes__ = patched_packet_bytes
-            logger.info("✅ PyAV Packet.__bytes__ patched")
+            logger.debug("✅ PyAV Packet.__bytes__ patched")
 
         # Patch to_bytes method if it exists
         if hasattr(Packet, "to_bytes"):
@@ -436,13 +436,13 @@ def patch_h264_encoder():
                     logger.debug(f"🎯 INTERCEPTED H.264 PACKET (to_bytes): {len(original_bytes)} bytes")
                     modified_bytes = inject_sei_into_bitstream(original_bytes)
                     if len(modified_bytes) != len(original_bytes):
-                        logger.info(f"📡 SEI injected via to_bytes: {len(original_bytes)} -> {len(modified_bytes)} bytes")
+                        logger.debug(f"📡 SEI injected via to_bytes: {len(original_bytes)} -> {len(modified_bytes)} bytes")
                         return modified_bytes
 
                 return original_bytes
 
             Packet.to_bytes = patched_to_bytes
-            logger.info("✅ PyAV Packet.to_bytes patched")
+            logger.debug("✅ PyAV Packet.to_bytes patched")
 
     except Exception:
         pass
@@ -451,6 +451,6 @@ def patch_h264_encoder():
 
 
 # Auto-apply patch when module is imported
-logger.info("🔧 h264_sei_patch module imported")
+logger.debug("🔧 h264_sei_patch module imported")
 patch_result = patch_h264_encoder()
-logger.info(f"🔧 H.264 encoder patch result: {patch_result}")
+logger.debug(f"🔧 H.264 encoder patch result: {patch_result}")

@@ -53,7 +53,7 @@ class H264DecoderPatcher:
 
             # If we found SEI messages, log them
             if messages:
-                logger.info(f"📡 Extracted {len(messages)} SEI messages from H.264 data")
+                logger.debug(f"📡 Extracted {len(messages)} SEI messages from H.264 data")
                 for msg in messages:
                     if hasattr(subscriber, "message_callback") and subscriber.message_callback:
                         subscriber.message_callback(msg)
