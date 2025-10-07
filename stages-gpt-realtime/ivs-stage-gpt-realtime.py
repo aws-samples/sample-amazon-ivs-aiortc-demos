@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+"""
+IVS Stage Publisher/Subscriber with OpenAI Real-time API
+
+This script connects to an IVS Stage as both a publisher and subscriber,
+processing incoming audio through OpenAI's real-time API and publishing
+the AI responses back to the stage.
+
+SEI Command Support:
+- Supports pause/unpause commands via SEI messages in the format:
+  {"type": "command", "sender": "user", "command": "pause", "timestamp": 1234567890} or
+  {"type": "command", "sender": "user", "command": "unpause", "timestamp": 1234567890}
+- Commands include a timestamp field for deduplication of repeated messages
+- When paused, incoming audio is received but not sent to OpenAI
+- When unpaused, audio processing resumes normally
+"""
 
 # Apply H.264 SEI patches BEFORE importing aiortc
 import sys
@@ -89,6 +104,8 @@ class IVSStageManager:
         self.gpt_manager: Optional[GptRealtimeManager] = None
         self.sei_subscriber: Optional[SeiSubscriber] = None
         self.connections: List[RTCPeerConnection] = []
+        self.is_paused: bool = False  # Track pause state for audio processing
+        self.processed_command_timestamps: set = set()  # Track processed command timestamps for deduplication
 
         # Apply ICE timeout patch
         self._apply_ice_timeout_patch()
@@ -165,13 +182,36 @@ class IVSStageManager:
 
     def _handle_sei_command(self, command: str, payload: dict):
         """
-        Handle SEI command messages.
+        Handle SEI command messages with timestamp-based deduplication.
 
         Args:
             command: The command string
-            payload: The full message payload
+            payload: The full message payload (should include 'timestamp' field)
         """
         try:
+            # Extract timestamp for deduplication
+            timestamp = payload.get("timestamp")
+            if timestamp is None:
+                logger.warning(f"⚠️ SEI command '{command}' missing timestamp - processing without deduplication")
+            else:
+                # Check if we've already processed this timestamp
+                if timestamp in self.processed_command_timestamps:
+                    logger.debug(f"🔄 Duplicate SEI command '{command}' with timestamp {timestamp} - ignoring")
+                    return
+
+                # Add timestamp to processed set
+                self.processed_command_timestamps.add(timestamp)
+                logger.debug(f"📝 Processing SEI command '{command}' with timestamp {timestamp}")
+
+                # Clean up old timestamps to prevent memory growth (keep last 1000)
+                if len(self.processed_command_timestamps) > 1000:
+                    # Remove oldest timestamps (this is a simple approach - could be improved with a proper LRU cache)
+                    sorted_timestamps = sorted(self.processed_command_timestamps)
+                    timestamps_to_remove = sorted_timestamps[:-500]  # Keep newest 500
+                    for old_timestamp in timestamps_to_remove:
+                        self.processed_command_timestamps.discard(old_timestamp)
+                    logger.debug(f"🧹 Cleaned up {len(timestamps_to_remove)} old command timestamps")
+
             if command == "mute":
                 logger.info("🔇 Received mute command via SEI")
                 # Could integrate with audio track muting here
@@ -184,11 +224,36 @@ class IVSStageManager:
             elif command == "status_request":
                 logger.info("📊 Received status request via SEI")
                 # Could send back system status
+            elif command == "pause":
+                if not self.is_paused:
+                    logger.info(f"⏸️ Received pause command via SEI (timestamp: {timestamp}) - pausing audio processing")
+                    self.is_paused = True
+                else:
+                    logger.info(f"⏸️ Received pause command via SEI (timestamp: {timestamp}) - already paused")
+            elif command == "unpause":
+                if self.is_paused:
+                    logger.info(f"▶️ Received unpause command via SEI (timestamp: {timestamp}) - resuming audio processing")
+                    self.is_paused = False
+                else:
+                    logger.info(f"▶️ Received unpause command via SEI (timestamp: {timestamp}) - already unpaused")
             else:
-                logger.info(f"❓ Unknown SEI command: {command}")
+                logger.info(f"❓ Unknown SEI command: {command} (timestamp: {timestamp})")
 
         except Exception as e:
             logger.error(f"❌ Error handling SEI command '{command}': {e}")
+
+    def get_pause_state(self) -> bool:
+        """Get the current pause state for debugging/monitoring"""
+        return self.is_paused
+
+    def get_command_stats(self) -> dict:
+        """Get statistics about processed commands for debugging/monitoring"""
+        return {
+            "processed_timestamps_count": len(self.processed_command_timestamps),
+            "is_paused": self.is_paused,
+            "oldest_timestamp": min(self.processed_command_timestamps) if self.processed_command_timestamps else None,
+            "newest_timestamp": max(self.processed_command_timestamps) if self.processed_command_timestamps else None,
+        }
 
     def _setup_global_sei_hooks(self) -> bool:
         """Setup global hooks for SEI extraction at the PyAV level"""
@@ -411,6 +476,7 @@ class IVSStageManager:
         # Process audio frames
         try:
             frame_count = 0
+            last_pause_log_time = 0
             while True:
                 try:
                     # Add timeout to recv() to avoid infinite blocking
@@ -421,9 +487,18 @@ class IVSStageManager:
                     resampled_frames = resampler.resample(frame)
 
                     for i, resampled_frame in enumerate(resampled_frames):
-                        # Convert to bytes and send directly to OpenAI
-                        audio_bytes = resampled_frame.to_ndarray().tobytes()
-                        await self.gpt_manager.add_audio_chunk(audio_bytes)
+                        # Check if audio processing is paused
+                        if not self.is_paused:
+                            # Convert to bytes and send directly to OpenAI
+                            audio_bytes = resampled_frame.to_ndarray().tobytes()
+                            await self.gpt_manager.add_audio_chunk(audio_bytes)
+                        else:
+                            # If paused, we still receive and process frames but don't send to OpenAI
+                            # Log periodically to show we're still receiving audio but not processing it
+                            current_time = time.time()
+                            if current_time - last_pause_log_time > 5.0:  # Log every 5 seconds
+                                logger.info("⏸️ Audio processing paused - receiving audio but not sending to OpenAI")
+                                last_pause_log_time = current_time
 
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout waiting for audio frame {frame_count} - no audio data received in 5 seconds")
@@ -787,6 +862,8 @@ async def main():
         logger.info(f"🎤 VAD silence duration: {args.vad_silence_duration_ms}ms")
     elif args.vad_mode == "semantic_vad":
         logger.info(f"🎤 VAD eagerness: {args.vad_eagerness}")
+
+    logger.info("⏯️ Audio processing starts in unpaused state (use SEI command 'pause'/'unpause' to control)")
 
     # Get OpenAI API key from argument or environment variable
     openai_api_key = args.openai_key or os.getenv("OPENAI_API_KEY")
