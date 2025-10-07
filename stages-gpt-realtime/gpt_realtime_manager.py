@@ -87,6 +87,9 @@ class GptRealtimeManager:
         set_global_sei_publisher(self.sei_publisher)
         logger.info("📡 SEI Publisher initialized for H.264 metadata transmission")
 
+        # User location storage
+        self.user_location = {"latitude": None, "longitude": None, "last_updated": None, "timestamp": None}
+
         logger.info(f"🤖 GptRealtimeManager initialized - model: {model}, voice: {voice}")
 
     async def initialize(self):
@@ -124,7 +127,9 @@ class GptRealtimeManager:
                         "You are a helpful AI assistant participating in a live video conversation. "
                         "Keep your responses conversational and natural. "
                         "Respond to what the user says in a friendly and engaging way. "
-                        "When users ask about what you can see or about their appearance, use the analyze_frame function to look at their video feed."
+                        "When users ask about what you can see or about their appearance, use the analyze_frame function to look at their video feed. "
+                        "When users ask for local recommendations, nearby places, weather, or anything location-specific, use the get_user_location function to access their current coordinates. "
+                        "If location data is available, you can provide relevant local information without asking them to share their location again."
                     ),
                     "voice": self.voice,
                     "input_audio_format": "pcm16",
@@ -163,6 +168,24 @@ class GptRealtimeManager:
                     },
                 }
             )
+
+        # Always add the location tool
+        functions.append(
+            {
+                "type": "function",
+                "name": "get_user_location",
+                "description": "Get the user's current location coordinates. Use this when the user asks for local recommendations, nearby places, weather, or anything location-specific. This provides latitude and longitude coordinates that can be used to provide relevant local information.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            }
+        )
+
+        logger.info(f"🔧 Configured {len(functions)} function tools for OpenAI assistant")
+        for func in functions:
+            logger.info(f"  - {func['name']}: {func['description'][:60]}...")
 
         return functions
 
@@ -449,6 +472,8 @@ class GptRealtimeManager:
 
             if function_name == "analyze_frame":
                 return await self._analyze_current_frame(args.get("prompt"))
+            elif function_name == "get_user_location":
+                return await self._get_user_location()
             else:
                 logger.warning(f"Unknown function call: {function_name}")
                 return {"error": f"Unknown function: {function_name}"}
@@ -565,6 +590,50 @@ class GptRealtimeManager:
     def set_current_frame(self, frame):
         """Set the current video frame for analysis"""
         self.frame = frame
+
+    def update_user_location_sync(self, latitude: str, longitude: str, timestamp: int):
+        """Update the user's location coordinates (synchronous version for SEI callbacks)"""
+        try:
+            # Convert string coordinates to float
+            lat_float = float(latitude)
+            long_float = float(longitude)
+
+            # Store the location data
+            self.user_location = {"latitude": lat_float, "longitude": long_float, "last_updated": time.time(), "timestamp": timestamp}
+
+            logger.info(f"📍 Updated user location: lat={lat_float}, long={long_float} (timestamp: {timestamp})")
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ Error updating user location - invalid coordinates: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error updating user location: {e}")
+
+    async def update_user_location(self, latitude: str, longitude: str, timestamp: int):
+        """Update the user's location coordinates (async version for compatibility)"""
+        self.update_user_location_sync(latitude, longitude, timestamp)
+
+    async def _get_user_location(self) -> Dict[str, Any]:
+        """Get the user's current location for function calls"""
+        try:
+            if self.user_location["latitude"] is None or self.user_location["longitude"] is None:
+                return {"error": "User location not available. The user needs to share their location first.", "has_location": False}
+
+            # Calculate how long ago the location was updated
+            time_since_update = time.time() - self.user_location["last_updated"]
+
+            logger.info(f"📍 Providing user location: lat={self.user_location['latitude']}, long={self.user_location['longitude']}")
+
+            return {
+                "latitude": self.user_location["latitude"],
+                "longitude": self.user_location["longitude"],
+                "last_updated_seconds_ago": round(time_since_update),
+                "timestamp": self.user_location["timestamp"],
+                "has_location": True,
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Error getting user location: {e}")
+            return {"error": str(e), "has_location": False}
 
     async def _publish_transcript_sei(self, role: str, transcript: str):
         """Publish transcript as SEI metadata"""

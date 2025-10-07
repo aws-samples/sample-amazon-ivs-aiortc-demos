@@ -196,7 +196,7 @@ class GptRealtimeAudioTrack(AudioStreamTrack):
 
                     # Log batch processing
                     if old_buffer_size == 0 and new_buffer_size > 0:
-                        logger.info(f"🎵 Gpt Realtime audio started: +{len(batch_data)} bytes (batched)")
+                        logger.debug(f"🎵 Gpt Realtime audio started: +{len(batch_data)} bytes (batched)")
                     else:
                         logger.debug(f"🎵 Batch processed: +{len(batch_data)} bytes, buffer: {new_buffer_size} bytes")
 

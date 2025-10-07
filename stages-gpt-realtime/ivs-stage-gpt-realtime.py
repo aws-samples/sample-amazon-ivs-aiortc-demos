@@ -10,9 +10,13 @@ SEI Command Support:
 - Supports pause/unpause commands via SEI messages in the format:
   {"type": "command", "sender": "user", "command": "pause", "timestamp": 1234567890} or
   {"type": "command", "sender": "user", "command": "unpause", "timestamp": 1234567890}
+- Supports location updates via SEI messages in the format:
+  {"type": "command", "sender": "user", "command": "update_location", "timestamp": 123456789,
+   "current_location_lat": "[lat]", "current_location_long": "[long]"}
 - Commands include a timestamp field for deduplication of repeated messages
 - When paused, incoming audio is received but not sent to OpenAI
 - When unpaused, audio processing resumes normally
+- Location data is stored and made available to the AI assistant for local recommendations
 """
 
 # Apply H.264 SEI patches BEFORE importing aiortc
@@ -72,9 +76,9 @@ gpt_realtime_audio_logger.setLevel(logging.INFO)
 gpt_realtime_realtime_logger = logging.getLogger("gpt_realtime_realtime_manager")
 gpt_realtime_realtime_logger.setLevel(logging.INFO)
 sei_logger = logging.getLogger("stages_sei.sei_subscriber")
-sei_logger.setLevel(logging.DEBUG)
+sei_logger.setLevel(logging.INFO)
 patch_logger = logging.getLogger("stages_sei.h264_sei_decoder_patch")
-patch_logger.setLevel(logging.DEBUG)
+patch_logger.setLevel(logging.INFO)
 
 # Suppress noisy external loggers
 aiortc_logger = logging.getLogger("aiortc")
@@ -166,7 +170,8 @@ class IVSStageManager:
                     # Handle command messages (e.g., mute, unmute, etc.)
                     command = payload.get("command")
                     logger.info(f"🎮 Command from {sender}: {command}")
-                    self._handle_sei_command(command, payload)
+                    # Handle command synchronously to avoid event loop issues
+                    self._handle_sei_command_sync(command, payload)
                 else:
                     # Handle generic messages or unknown formats
                     if content:
@@ -180,7 +185,85 @@ class IVSStageManager:
             logger.error(f"❌ Error handling SEI message: {e}")
             logger.debug(f"SEI message data: {sei_message.to_dict()}")
 
-    def _handle_sei_command(self, command: str, payload: dict):
+    def _handle_sei_command_sync(self, command: str, payload: dict):
+        """
+        Handle SEI command messages synchronously with timestamp-based deduplication.
+        This avoids event loop issues when called from SEI callbacks.
+
+        Args:
+            command: The command string
+            payload: The full message payload (should include 'timestamp' field)
+        """
+        try:
+            # Extract timestamp for deduplication
+            timestamp = payload.get("timestamp")
+            if timestamp is None:
+                logger.warning(f"⚠️ SEI command '{command}' missing timestamp - processing without deduplication")
+            else:
+                # Check if we've already processed this timestamp
+                if timestamp in self.processed_command_timestamps:
+                    logger.debug(f"🔄 Duplicate SEI command '{command}' with timestamp {timestamp} - ignoring")
+                    return
+
+                # Add timestamp to processed set
+                self.processed_command_timestamps.add(timestamp)
+                logger.debug(f"📝 Processing SEI command '{command}' with timestamp {timestamp}")
+
+                # Clean up old timestamps to prevent memory growth (keep last 1000)
+                if len(self.processed_command_timestamps) > 1000:
+                    # Remove oldest timestamps (this is a simple approach - could be improved with a proper LRU cache)
+                    sorted_timestamps = sorted(self.processed_command_timestamps)
+                    timestamps_to_remove = sorted_timestamps[:-500]  # Keep newest 500
+                    for old_timestamp in timestamps_to_remove:
+                        self.processed_command_timestamps.discard(old_timestamp)
+                    logger.debug(f"🧹 Cleaned up {len(timestamps_to_remove)} old command timestamps")
+
+            if command == "mute":
+                logger.info("🔇 Received mute command via SEI")
+                # Could integrate with audio track muting here
+            elif command == "unmute":
+                logger.info("🔊 Received unmute command via SEI")
+                # Could integrate with audio track unmuting here
+            elif command == "ping":
+                logger.info("🏓 Received ping command via SEI")
+                # Could send a pong response back
+            elif command == "status_request":
+                logger.info("📊 Received status request via SEI")
+                # Could send back system status
+            elif command == "pause":
+                if not self.is_paused:
+                    logger.info(f"⏸️ Received pause command via SEI (timestamp: {timestamp}) - pausing audio processing")
+                    self.is_paused = True
+                else:
+                    logger.info(f"⏸️ Received pause command via SEI (timestamp: {timestamp}) - already paused")
+            elif command == "unpause":
+                if self.is_paused:
+                    logger.info(f"▶️ Received unpause command via SEI (timestamp: {timestamp}) - resuming audio processing")
+                    self.is_paused = False
+                else:
+                    logger.info(f"▶️ Received unpause command via SEI (timestamp: {timestamp}) - already unpaused")
+            elif command == "update_location":
+                # Extract location data
+                current_lat = payload.get("current_location_lat")
+                current_long = payload.get("current_location_long")
+
+                if current_lat is not None and current_long is not None:
+                    logger.info(f"📍 Received location update via SEI (timestamp: {timestamp}) - lat: {current_lat}, long: {current_long}")
+
+                    # Update location in GPT manager if available (synchronously)
+                    if self.gpt_manager:
+                        self.gpt_manager.update_user_location_sync(current_lat, current_long, timestamp)
+                    else:
+                        logger.warning("⚠️ GPT manager not available to store location data")
+                else:
+                    logger.warning(f"⚠️ Location update command missing coordinates (timestamp: {timestamp})")
+            else:
+                logger.info(f"❓ Unknown SEI command: {command} (timestamp: {timestamp})")
+
+        except Exception as e:
+            logger.error(f"❌ Error handling SEI command '{command}': {e}")
+
+    async def _handle_sei_command(self, command: str, payload: dict):
         """
         Handle SEI command messages with timestamp-based deduplication.
 
@@ -236,6 +319,21 @@ class IVSStageManager:
                     self.is_paused = False
                 else:
                     logger.info(f"▶️ Received unpause command via SEI (timestamp: {timestamp}) - already unpaused")
+            elif command == "update_location":
+                # Extract location data
+                current_lat = payload.get("current_location_lat")
+                current_long = payload.get("current_location_long")
+
+                if current_lat is not None and current_long is not None:
+                    logger.info(f"📍 Received location update via SEI (timestamp: {timestamp}) - lat: {current_lat}, long: {current_long}")
+
+                    # Update location in GPT manager if available
+                    if self.gpt_manager:
+                        await self.gpt_manager.update_user_location(current_lat, current_long, timestamp)
+                    else:
+                        logger.warning("⚠️ GPT manager not available to store location data")
+                else:
+                    logger.warning(f"⚠️ Location update command missing coordinates (timestamp: {timestamp})")
             else:
                 logger.info(f"❓ Unknown SEI command: {command} (timestamp: {timestamp})")
 
@@ -248,12 +346,25 @@ class IVSStageManager:
 
     def get_command_stats(self) -> dict:
         """Get statistics about processed commands for debugging/monitoring"""
-        return {
+        stats = {
             "processed_timestamps_count": len(self.processed_command_timestamps),
             "is_paused": self.is_paused,
             "oldest_timestamp": min(self.processed_command_timestamps) if self.processed_command_timestamps else None,
             "newest_timestamp": max(self.processed_command_timestamps) if self.processed_command_timestamps else None,
         }
+
+        # Add location info if GPT manager is available
+        if self.gpt_manager and hasattr(self.gpt_manager, "user_location"):
+            location = self.gpt_manager.user_location
+            stats["user_location"] = {
+                "has_location": location["latitude"] is not None and location["longitude"] is not None,
+                "latitude": location["latitude"],
+                "longitude": location["longitude"],
+                "last_updated": location["last_updated"],
+                "timestamp": location["timestamp"],
+            }
+
+        return stats
 
     def _setup_global_sei_hooks(self) -> bool:
         """Setup global hooks for SEI extraction at the PyAV level"""
@@ -527,7 +638,7 @@ class IVSStageManager:
                     try:
                         sei_messages = await self.sei_subscriber.process_frame(frame)
                         if sei_messages:
-                            logger.info(f"📡 Extracted {len(sei_messages)} SEI messages from frame {frame_count}")
+                            logger.debug(f"📡 Extracted {len(sei_messages)} SEI messages from frame {frame_count}")
                     except Exception as sei_error:
                         logger.debug(f"SEI extraction error on frame {frame_count}: {sei_error}")
 
