@@ -268,33 +268,71 @@ For detailed documentation, see [`channels-subscribe/README.md`](channels-subscr
 
 ### Stages Publish
 
-The `stages-publish/` directory contains scripts for publishing media content to IVS Real-Time Stages.
+The `stages-publish/` directory contains scripts for publishing media content to IVS Real-Time Stages from MP4 files or live HLS streams.
 
 #### ivs-stage-publish.py
 
-Basic media publishing script that streams video/audio content to an IVS stage.
+Basic media publishing script that streams video/audio content to an IVS stage from MP4 files or HLS streams.
 
 **Features:**
 
-- Publishes video and audio tracks from MP4 files to IVS Real-Time Stages
+- Publishes video and audio tracks from MP4 files or M3U8 HLS streams to IVS Real-Time Stages
 - JWT token validation and capability checking
 - WebRTC connection management
 - Option to publish video-only streams
+- Optional HLS stream health monitoring with automatic exit when stream ends
+- Configurable stream check intervals for cost-effective monitoring
 
 **Usage:**
 
 ```bash
 cd stages-publish
+
+# Publish MP4 file
 python ivs-stage-publish.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --path-to-mp4 "path/to/video.mp4"
+
+# Publish HLS stream
+python ivs-stage-publish.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --m3u8-url "https://example.com/stream.m3u8"
+
+# Publish HLS stream with automatic exit when stream ends
+python ivs-stage-publish.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --m3u8-url "https://example.com/stream.m3u8" \
+  --stream-check-interval 30
 ```
 
 **Command-line Arguments:**
 
 - `--token`: JWT participant token with publish capabilities (required)
-- `--path-to-mp4`: Path to MP4 file to publish (required)
+- `--path-to-mp4`: Path to MP4 file to publish (mutually exclusive with --m3u8-url)
+- `--m3u8-url`: M3U8 playlist URL for HLS stream to publish (mutually exclusive with --path-to-mp4)
 - `--video-only`: Publish video only, no audio (optional flag)
+- `--stream-check-interval`: Interval in seconds to check HLS stream health - enables automatic exit when stream ends (optional, HLS only)
+
+**HLS Stream Monitoring:**
+
+When using `--stream-check-interval`, the script monitors HLS stream health by periodically checking if the M3U8 playlist is still accessible:
+
+- **Automatic Exit**: Script gracefully exits when the HLS stream stops broadcasting
+- **Rapid Verification**: After a health check failure, the next 2 checks use a 1-second interval for quick verification
+- **Consecutive Failures**: Requires 3 consecutive failures before declaring the stream offline
+- **Cost Control**: Only makes HTTP requests when explicitly enabled with the parameter
+- **No Interference**: Stream monitoring doesn't affect video/audio quality or WebRTC performance
+
+**Stream Monitoring Behavior:**
+
+```
+Normal check (30s) → ✅ Healthy → Wait 30s
+Normal check (30s) → ❌ Failed → Wait 1s (rapid check 1/2)
+Rapid check (2s)   → ❌ Failed → Wait 1s (rapid check 2/2)
+Rapid check (2s)   → ❌ Failed → Stream declared offline, exit gracefully
+```
+
+**Without `--stream-check-interval`**: Script runs indefinitely until manually stopped (Ctrl+C), regardless of stream status.
 
 #### ivs-stage-publish-events.py
 
@@ -740,13 +778,36 @@ python channels-subscribe/ivs-channel-subscribe-analyze-audio-video.py \
 
 ### IVS Real-Time Stages Examples
 
-#### Basic Publishing Example
+#### Basic Publishing Examples
 
 ```bash
 # Publish MP4 file to IVS stage
 python stages-publish/ivs-stage-publish.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --path-to-mp4 "sample-video.mp4"
+
+# Publish HLS stream to IVS stage
+python stages-publish/ivs-stage-publish.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --m3u8-url "https://example.com/live/stream.m3u8"
+
+# Publish HLS stream with automatic exit when stream ends (check every 30 seconds)
+python stages-publish/ivs-stage-publish.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --m3u8-url "https://example.com/live/stream.m3u8" \
+  --stream-check-interval 30
+
+# Publish HLS stream with frequent monitoring (check every 10 seconds)
+python stages-publish/ivs-stage-publish.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM8NCJ9..." \
+  --m3u8-url "https://example.com/live/stream.m3u8" \
+  --stream-check-interval 10
+
+# Publish video-only HLS stream
+python stages-publish/ivs-stage-publish.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --m3u8-url "https://example.com/live/stream.m3u8" \
+  --video-only
 ```
 
 #### Publishing with Events Example
