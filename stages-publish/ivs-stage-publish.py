@@ -55,6 +55,16 @@ def validate_publish_capability(token_payload: Dict[str, Any]) -> bool:
     return True
 
 
+def check_hls_stream_health(m3u8_url: str, timeout: int = 10) -> bool:
+    """Check if HLS stream is still available by making a GET request to the playlist"""
+    try:
+        response = requests.get(m3u8_url, timeout=timeout)
+        return response.status_code == 200
+    except Exception as e:
+        logger.debug(f"HLS health check failed: {e}")
+        return False
+
+
 def fix_ivs_answer_sdp(sdp: str) -> str:
     """Fix IVS's SDP answer to ensure ICE candidates are in both audio and video sections"""
     # logger.info("=== ORIGINAL IVS ANSWER ===")
@@ -118,7 +128,7 @@ def fix_ivs_answer_sdp(sdp: str) -> str:
     return result
 
 
-async def join_stage_as_publisher(token: str, path_to_mp4: str, video_only: bool):
+async def join_stage_as_publisher(token: str, media_source: str, video_only: bool):
     """Join the IVS stage as a publisher using WebRTC"""
     logger.info("🚀 Joining stage as publisher...")
 
@@ -131,8 +141,14 @@ async def join_stage_as_publisher(token: str, path_to_mp4: str, video_only: bool
     whip_base_url = "https://global.whip.live-video.net"
     logger.info(f"🔗 WHIP Base URL: {whip_base_url}")
 
-    # Create media player
-    media = MediaPlayer(path_to_mp4)
+    # Determine media source type and create media player
+    is_hls_stream = media_source.lower().endswith(".m3u8") or media_source.startswith("http")
+    if is_hls_stream:
+        logger.info(f"🎬 Using HLS stream: {media_source}")
+        media = MediaPlayer(media_source, format="hls")
+    else:
+        logger.info(f"🎬 Using MP4 file: {media_source}")
+        media = MediaPlayer(media_source)
 
     # Add tracks to peer connection
     if not video_only:
@@ -204,15 +220,24 @@ async def join_stage_as_publisher(token: str, path_to_mp4: str, video_only: bool
     await pc.setRemoteDescription(RTCSessionDescription(sdp=fixed_answer_sdp, type="answer"))
 
     logger.info("✅ Successfully joined stage as publisher")
-    return pc
+    return pc, media, is_hls_stream
 
 
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="IVS Stage Publisher")
     parser.add_argument("--token", required=True, help="IVS stage participant token")
-    parser.add_argument("--path-to-mp4", required=True, help="Path to MP4 file to publish")
+
+    # Create mutually exclusive group for media source
+    media_group = parser.add_mutually_exclusive_group(required=True)
+    media_group.add_argument("--path-to-mp4", help="Path to MP4 file to publish")
+    media_group.add_argument("--m3u8-url", help="M3U8 playlist URL for HLS stream to publish")
+
     parser.add_argument("--video-only", action="store_true", help="Publish video only (no audio)")
+    parser.add_argument(
+        "--stream-check-interval", type=int, help="Interval in seconds to check HLS stream health (enables automatic exit when stream ends)"
+    )
+
     return parser.parse_args()
 
 
@@ -222,6 +247,10 @@ async def main():
 
     logger.info("🎬 Starting IVS Stage Publisher")
     logger.info(f"🔑 Using token: {args.token[:50]}... (truncated)")
+
+    # Determine media source
+    media_source = args.path_to_mp4 if args.path_to_mp4 else args.m3u8_url
+    logger.info(f"📺 Media source: {media_source}")
 
     # Parse the JWT token to extract required fields
     token_payload = parse_jwt(args.token)
@@ -250,22 +279,60 @@ async def main():
 
     try:
         # Start WebRTC publishing
-        publish_task = asyncio.create_task(join_stage_as_publisher(args.token, args.path_to_mp4, args.video_only))
+        publish_task = asyncio.create_task(join_stage_as_publisher(args.token, media_source, args.video_only))
 
         # Wait for publishing to complete first
-        pc = await publish_task
+        result = await publish_task
 
-        if pc:
+        if result:
+            pc, media, is_hls_stream = result
             logger.info("🎉 WebRTC publishing established! ")
 
-            # Keep the connection alive and monitor events
+            # Keep the connection alive and optionally monitor stream health
             try:
-                while True:
-                    await asyncio.sleep(1)  # Keep the event loop running
+                if is_hls_stream and args.stream_check_interval:
+                    logger.info(f"📡 HLS stream monitoring enabled - checking every {args.stream_check_interval}s")
+                    consecutive_failures = 0
+                    max_failures = 3  # Allow 3 consecutive failures before giving up
+                    rapid_check_count = 0  # Track how many rapid checks we've done
+
+                    while True:
+                        # Check if HLS playlist is still available
+                        is_healthy = await asyncio.get_event_loop().run_in_executor(None, check_hls_stream_health, media_source, 10)
+
+                        if is_healthy:
+                            consecutive_failures = 0
+                            rapid_check_count = 0  # Reset rapid check counter on success
+                            logger.debug("📡 HLS stream is healthy")
+                            next_interval = args.stream_check_interval
+                        else:
+                            consecutive_failures += 1
+                            logger.warning(f"❌ HLS stream  check failed ({consecutive_failures}/{max_failures})")
+
+                            if consecutive_failures >= max_failures:
+                                logger.info(f"📺 HLS stream appears to be offline (failed {max_failures} consecutive checks)")
+                                break
+
+                            # Use 1-second interval for next 1 checks after a failure
+                            if rapid_check_count < 2:
+                                rapid_check_count += 1
+                                next_interval = 1
+                                logger.info(f"⚡ Using rapid check interval (1s) - check {rapid_check_count}/2")
+                            else:
+                                next_interval = args.stream_check_interval
+
+                        await asyncio.sleep(next_interval)
+                else:
+                    logger.info("🎉 Publishing active - press Ctrl+C to stop")
+                    while True:
+                        await asyncio.sleep(1)
+
             except KeyboardInterrupt:
                 logger.info("🛑 Shutting down...")
             finally:
-                # Clean up peer connection
+                # Clean up media player and peer connection
+                if hasattr(media, "stop"):
+                    media.stop()
                 await pc.close()
                 logger.info("🔌 WebRTC connection closed")
         else:
