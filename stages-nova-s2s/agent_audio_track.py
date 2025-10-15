@@ -38,9 +38,6 @@ class AgentAudioTrack(AudioStreamTrack):
         self.last_batch_time = time.time()
         self.batch_timeout = 0.040  # Force batch processing after 40ms max
 
-        # Track current audio session
-        self.current_audio_session = None
-
         # WebRTC stats debugging
         self.last_stats_time = 0
         self.stats_interval = 5.0  # Print stats every 5 seconds
@@ -55,13 +52,6 @@ class AgentAudioTrack(AudioStreamTrack):
 
         # Fixed timing for consistent audio frame rate
         self.target_fps = 50.0  # Target 50 FPS (20ms chunks)
-
-        # Dynamic chunk sizing
-        self.base_chunk_size_bytes = self.chunk_size_bytes  # Store original
-        self.last_network_check = time.time()
-        self.network_check_interval = 3.0  # Check network every 3 seconds
-        self.recent_rtt_samples = []
-        self.recent_jitter_samples = []
 
         logger.info(
             f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
@@ -93,113 +83,6 @@ class AgentAudioTrack(AudioStreamTrack):
                 f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
                 f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
             )
-
-            # Try to get WebRTC stats if peer connection is available
-
-            if self.peer_connection:
-                try:
-                    logger.debug("🔍 Attempting to get WebRTC stats...")
-                    stats = await self.peer_connection.getStats()
-                    logger.debug(f"📊 Got {len(stats)} WebRTC stats objects")
-
-                    # Debug: print all stat types we're seeing
-                    stat_types = [getattr(stat, "type", "no-type") for stat in stats.values() if hasattr(stat, "type")]
-                    logger.debug(f"📊 Stat types found: {set(stat_types)}")
-
-                    # Look for relevant audio stats
-                    found_audio_stats = False
-                    found_network_stats = False
-
-                    for stat in stats.values():
-                        if hasattr(stat, "type"):
-                            # Audio outbound RTP stats
-                            if stat.type == "outbound-rtp" and hasattr(stat, "kind") and stat.kind == "audio":
-                                found_audio_stats = True
-                                logger.debug(
-                                    f"📡 WebRTC Audio Out - Packets sent: {getattr(stat, 'packetsSent', 'N/A')}, "
-                                    f"Bytes sent: {getattr(stat, 'bytesSent', 'N/A')}"
-                                )
-                            # Network stats from remote inbound RTP (has RTT and jitter)
-                            elif stat.type == "remote-inbound-rtp":
-                                found_network_stats = True
-                                rtt = getattr(stat, "roundTripTime", None)
-                                jitter = getattr(stat, "jitter", None)
-                                packets_lost = getattr(stat, "packetsLost", None)
-                                if rtt is not None:
-                                    logger.debug(f"🌐 Network - RTT: {rtt*1000:.1f}ms, " f"Jitter: {jitter}, Packets lost: {packets_lost}")
-                                    # Collect network samples for chunk size adaptation
-                                    # DISABLED: self._collect_network_sample(rtt, jitter)
-
-                    if not found_audio_stats:
-                        logger.debug("⚠️  No outbound audio RTP stats found")
-                    if not found_network_stats:
-                        logger.debug("⚠️  No successful candidate-pair stats found")
-
-                except Exception as e:
-                    logger.info(f"❌ Could not get WebRTC stats: {e}")
-            else:
-                logger.debug("⚠️  No peer connection available for stats")
-
-            # Note: Removed adaptive timing adjustment as it was causing performance issues
-
-            # Adaptive chunk sizing based on network conditions
-            # DISABLED: Causes audio jitter due to frequent chunk size changes
-            # self._adjust_chunk_size_based_on_network()
-
-    def _collect_network_sample(self, rtt, jitter):
-        """Collect network performance samples for chunk size adaptation"""
-        current_time = time.time()
-
-        # Keep recent samples (last 10 seconds worth)
-        self.recent_rtt_samples.append((current_time, rtt))
-        self.recent_jitter_samples.append((current_time, jitter))
-
-        # Remove old samples
-        cutoff_time = current_time - 10.0
-        self.recent_rtt_samples = [(t, v) for t, v in self.recent_rtt_samples if t > cutoff_time]
-        self.recent_jitter_samples = [(t, v) for t, v in self.recent_jitter_samples if t > cutoff_time]
-
-    def _adjust_chunk_size_based_on_network(self):
-        """Adjust chunk size based on network conditions"""
-        current_time = time.time()
-        if current_time - self.last_network_check >= self.network_check_interval:
-            self.last_network_check = current_time
-
-            if len(self.recent_rtt_samples) >= 3 and len(self.recent_jitter_samples) >= 3:
-                # Calculate network stability metrics
-                rtt_values = [v for _, v in self.recent_rtt_samples]
-                jitter_values = [v for _, v in self.recent_jitter_samples]
-
-                avg_rtt = sum(rtt_values) / len(rtt_values)
-                avg_jitter = sum(jitter_values) / len(jitter_values)
-                rtt_variance = max(rtt_values) - min(rtt_values)
-
-                # Determine optimal chunk size based on network conditions
-                old_chunk_size = self.chunk_size_bytes
-
-                if avg_jitter > 1500 or rtt_variance > 0.050:  # High jitter or RTT variance
-                    # Use larger chunks for stability (40ms)
-                    self.chunk_size_bytes = int(self.sample_rate * 0.040 * 2)  # 40ms chunks
-                    reason = f"high jitter ({avg_jitter:.0f}) or RTT variance ({rtt_variance*1000:.1f}ms)"
-                elif avg_rtt > 0.080:  # High RTT (>80ms)
-                    # Use larger chunks to compensate for latency (30ms)
-                    self.chunk_size_bytes = int(self.sample_rate * 0.030 * 2)  # 30ms chunks
-                    reason = f"high RTT ({avg_rtt*1000:.1f}ms)"
-                elif avg_jitter < 100 and avg_rtt < 0.040:  # Excellent network
-                    # Use smaller chunks for low latency (15ms)
-                    self.chunk_size_bytes = int(self.sample_rate * 0.015 * 2)  # 15ms chunks
-                    reason = f"excellent network (RTT: {avg_rtt*1000:.1f}ms, jitter: {avg_jitter:.0f})"
-                else:
-                    # Use default chunk size (20ms)
-                    self.chunk_size_bytes = self.base_chunk_size_bytes
-                    reason = "balanced network conditions"
-
-                # Update minimum buffer threshold based on new chunk size
-                self.min_buffer_threshold = self.chunk_size_bytes * 3
-
-                if old_chunk_size != self.chunk_size_bytes:
-                    chunk_duration_ms = (self.chunk_size_bytes // 2) / self.sample_rate * 1000
-                    logger.info(f"📦 Chunk size adapted: {old_chunk_size} → {self.chunk_size_bytes} bytes " f"({chunk_duration_ms:.1f}ms) - {reason}")
 
     async def recv(self):
         """Generate and return audio frames from Nova responses - back to basics"""
@@ -270,7 +153,7 @@ class AgentAudioTrack(AudioStreamTrack):
             # Fixed timing to maintain proper audio frame rate
             # For 24kHz audio with 20ms chunks (480 samples), we should target 50 FPS
             # Only sleep if we're running at or above target FPS to avoid slowing down low FPS streams
-            target_sleep = 0.020  # 20ms = 50 FPS
+            target_sleep = 0.015  # 20ms = 50 FPS
 
             if self.avg_fps >= 50:
                 if buffer_was_empty:
@@ -353,7 +236,6 @@ class AgentAudioTrack(AudioStreamTrack):
         async with self.buffer_lock:
             self.audio_buffer.clear()
             self.batch_buffer.clear()  # Clear batch buffer too
-            self.current_audio_session = None
             logger.info("🛑 Audio buffer cleared due to interruption")
 
         # Reset video throb to idle state
