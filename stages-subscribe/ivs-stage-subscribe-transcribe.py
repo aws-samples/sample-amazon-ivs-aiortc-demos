@@ -10,6 +10,8 @@ import requests
 import av
 import time
 import numpy as np
+import os
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
 import whisper
@@ -35,12 +37,66 @@ INT32_MAX: float = 2147483648.0
 WHISPER_SAMPLE_RATE: int = 16000
 
 
+class VTTWriter:
+    """Handles writing transcriptions to VTT format files"""
+
+    def __init__(self, output_path: str) -> None:
+        self.output_path: str = output_path
+        self.start_time: Optional[datetime] = None
+        self.sequence_number: int = 1
+
+        # Create directory if it doesn't exist
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+
+        # Initialize VTT file with header
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("WEBVTT\n\n")
+
+        logger.info(f"VTT transcription output initialized: {output_path}")
+
+    def write_transcription(self, text: str, chunk_start_time: float, chunk_duration: int) -> None:
+        """Write a transcription segment to the VTT file"""
+        if not text.strip():
+            return
+
+        if self.start_time is None:
+            self.start_time = datetime.now()
+
+        # Calculate timestamps relative to recording start
+        start_seconds = chunk_start_time
+        end_seconds = start_seconds + chunk_duration
+
+        # Format timestamps for VTT (HH:MM:SS.mmm)
+        start_time_str = self._format_vtt_timestamp(start_seconds)
+        end_time_str = self._format_vtt_timestamp(end_seconds)
+
+        # Write VTT cue
+        with open(self.output_path, "a", encoding="utf-8") as f:
+            f.write(f"{self.sequence_number}\n")
+            f.write(f"{start_time_str} --> {end_time_str}\n")
+            f.write(f"{text.strip()}\n\n")
+
+        self.sequence_number += 1
+        logger.debug(f"VTT cue written: {start_time_str} --> {end_time_str}: {text.strip()}")
+
+    def _format_vtt_timestamp(self, seconds: float) -> str:
+        """Format seconds as VTT timestamp (HH:MM:SS.mmm)"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
+
 class AudioChunkRecorder:
     def __init__(
         self,
         track: MediaStreamTrack,
         chunk_duration: int = CHUNK_DURATION,
         language: str = "en",
+        transcription_output_path: Optional[str] = None,
+        transcription_output_format: Optional[str] = None,
     ) -> None:
         self.track: MediaStreamTrack = track
         self.chunk_duration: int = chunk_duration
@@ -50,6 +106,16 @@ class AudioChunkRecorder:
         self._start_time: Optional[float] = None
         self._should_stop: bool = False
         self._resampler: av.AudioResampler = av.AudioResampler(format="s16", layout="mono" if CHANNELS == 1 else "stereo", rate=SAMPLE_RATE)
+
+        # Initialize transcription output writer if enabled
+        self.vtt_writer: Optional[VTTWriter] = None
+        if transcription_output_path and transcription_output_format:
+            if transcription_output_format.lower() == "vtt":
+                self.vtt_writer = VTTWriter(transcription_output_path)
+            else:
+                logger.warning(f"Unsupported transcription output format: {transcription_output_format}")
+        elif transcription_output_path or transcription_output_format:
+            logger.warning("Both --transcription-output-path and --transcription-output-format must be specified to enable transcription output")
 
     async def start(self) -> None:
         logger.info("Starting audio recording...")
@@ -122,6 +188,11 @@ class AudioChunkRecorder:
 
                 if text:
                     print(f"[TRANSCRIPT] {text}")
+
+                    # Save to transcription file if enabled
+                    if self.vtt_writer:
+                        chunk_start_time = (self._count - 1) * self.chunk_duration
+                        self.vtt_writer.write_transcription(text, chunk_start_time, self.chunk_duration)
                 else:
                     logger.info("No speech detected in chunk")
 
@@ -217,6 +288,12 @@ async def main() -> None:
     logger.info(f"Language: {args.language}")
     logger.info(f"FP16: {args.fp16}")
 
+    # Log transcription output configuration
+    if hasattr(args, "transcription_output_path") and args.transcription_output_path:
+        logger.info(f"Transcription output enabled: {args.transcription_output_path} (format: {args.transcription_output_format})")
+    else:
+        logger.info("Transcription output disabled")
+
     # Set global FP16 variable
     FP16 = args.fp16
 
@@ -238,7 +315,13 @@ async def main() -> None:
         if track.kind == "audio":
             logger.info("Audio track received - starting recording and transcription")
 
-            chunk_recorder = AudioChunkRecorder(track, args.chunk_duration, args.language)
+            chunk_recorder = AudioChunkRecorder(
+                track,
+                args.chunk_duration,
+                args.language,
+                getattr(args, "transcription_output_path", None),
+                getattr(args, "transcription_output_format", None),
+            )
             await chunk_recorder.start()
 
     # Create offer
@@ -268,11 +351,7 @@ async def main() -> None:
 
     try:
         response: requests.Response = requests.post(
-            whep_url, 
-            data=pc.localDescription.sdp, 
-            headers=headers, 
-            allow_redirects=False,
-            timeout=10  # Add explicit timeout of 10 seconds
+            whep_url, data=pc.localDescription.sdp, headers=headers, allow_redirects=False, timeout=10  # Add explicit timeout of 10 seconds
         )
     except requests.exceptions.Timeout:
         logger.error(f"Request to {whep_url} timed out after 10 seconds")
@@ -285,12 +364,7 @@ async def main() -> None:
         redirect_url: Optional[str] = response.headers.get("Location")
         logger.info(f"Redirected to: {redirect_url}")
         try:
-            response = requests.post(
-                redirect_url, 
-                data=pc.localDescription.sdp, 
-                headers=headers,
-                timeout=10  # Add explicit timeout of 10 seconds
-            )
+            response = requests.post(redirect_url, data=pc.localDescription.sdp, headers=headers, timeout=10)  # Add explicit timeout of 10 seconds
         except requests.exceptions.Timeout:
             logger.error(f"Request to {redirect_url} timed out after 10 seconds")
             return None
@@ -330,6 +404,7 @@ Examples:
   %(prog)s --participant-id user123 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
   %(prog)s --participant-id user123 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9... --whisper-model base --language es
   %(prog)s --participant-id user123 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9... --chunk-duration 10 --language auto
+  %(prog)s --participant-id user123 --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9... --transcription-output-path output.vtt --transcription-output-format vtt
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -367,6 +442,17 @@ Examples:
         type=int,
         default=CHUNK_DURATION,
         help=f"Duration in seconds for each audio chunk to transcribe (default: {CHUNK_DURATION})",
+    )
+
+    parser.add_argument(
+        "--transcription-output-path",
+        help="Path to save transcription output file (e.g., 'transcription.vtt'). Must be used with --transcription-output-format",
+    )
+
+    parser.add_argument(
+        "--transcription-output-format",
+        choices=["vtt"],
+        help="Format for transcription output file. Currently supported: vtt. Must be used with --transcription-output-path",
     )
 
     return parser.parse_args()

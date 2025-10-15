@@ -393,7 +393,7 @@ The `stages-subscribe/` directory contains scripts for receiving and processing 
 
 #### ivs-stage-subscribe-transcribe.py
 
-Subscribes to IVS stage audio streams and provides real-time speech-to-text transcription using OpenAI Whisper.
+Subscribes to IVS stage audio streams and provides real-time speech-to-text transcription using OpenAI Whisper with optional VTT file output.
 
 **Features:**
 
@@ -402,6 +402,8 @@ Subscribes to IVS stage audio streams and provides real-time speech-to-text tran
 - Audio chunk processing and buffering
 - Multiple language support
 - Audio format conversion and normalization
+- Optional VTT (WebVTT) subtitle file output with proper timestamps
+- Real-time transcription file writing for live captioning
 
 **Usage:**
 
@@ -410,6 +412,13 @@ cd stages-subscribe
 python ivs-stage-subscribe-transcribe.py \
   --participant-id "participant123" \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With VTT output
+python ivs-stage-subscribe-transcribe.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --transcription-output-path "output.vtt" \
+  --transcription-output-format "vtt"
 ```
 
 **Command-line Arguments:**
@@ -420,6 +429,8 @@ python ivs-stage-subscribe-transcribe.py \
 - `--fp16`: Enable FP16 precision for faster processing (default: true)
 - `--language`: Language code for transcription (default: "en")
 - `--chunk-duration`: Audio chunk duration in seconds (default: 5)
+- `--transcription-output-path`: Path to save transcription output file (optional)
+- `--transcription-output-format`: Format for transcription output - currently supports "vtt" (optional)
 
 **Supported Languages:**
 
@@ -819,15 +830,37 @@ python stages-publish/ivs-stage-publish-events.py \
   --path-to-mp4 "sample-video.mp4"
 ```
 
-#### Transcription Example
+#### Transcription Examples
 
 ```bash
+# Basic transcription (console output only)
+python stages-subscribe/ivs-stage-subscribe-transcribe.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
 # Subscribe and transcribe audio in Spanish
 python stages-subscribe/ivs-stage-subscribe-transcribe.py \
   --participant-id "participant123" \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --language "es" \
   --whisper-model "medium"
+
+# Save transcription to VTT file for live captioning
+python stages-subscribe/ivs-stage-subscribe-transcribe.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --transcription-output-path "live_captions.vtt" \
+  --transcription-output-format "vtt"
+
+# High-quality transcription with VTT output
+python stages-subscribe/ivs-stage-subscribe-transcribe.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --whisper-model "large-v3" \
+  --language "en" \
+  --chunk-duration "10" \
+  --transcription-output-path "meeting_transcript.vtt" \
+  --transcription-output-format "vtt"
 ```
 
 #### Video Frame Analysis Examples
@@ -1098,6 +1131,8 @@ python your-script.py --your-args
    - Choose appropriate chunk duration (5-10 seconds)
    - Use smaller Whisper models for real-time processing
    - Consider GPU acceleration for large models
+   - Use VTT output for live captioning applications
+   - Specify language explicitly for better accuracy and performance
 
 #### General Optimization
 
