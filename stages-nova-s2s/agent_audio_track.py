@@ -22,21 +22,13 @@ class AgentAudioTrack(AudioStreamTrack):
         self.channels = channels
         self.agent_video_track = agent_video_track  # Reference to update throb
 
-        # Conservative chunk size for smooth playback - balanced for production
-        self.chunk_size_bytes = 480 * 3  # Moderate increase: 1440 bytes (30ms at 24kHz)
+        # Simple approach based on AWS documentation - small chunks for low latency
+        self.chunk_size_bytes = 1024 * 2  # 2048 bytes - matches AWS example approach (1024 samples * 2 bytes)
 
-        # Buffer management with reasonable threshold
-        self.audio_buffer = bytearray()
-        self.buffer_lock = asyncio.Lock()
+        # Simple queue-based approach like AWS documentation
+        self.audio_queue = asyncio.Queue()
         self.frame_count = 0
-        self.max_buffer_size = sample_rate * 2 * 60  # 60 seconds max
-        self.min_buffer_threshold = self.chunk_size_bytes * 2  # Keep 2 chunks minimum (conservative)
-
-        # Audio batching for performance - conservative optimization
-        self.batch_buffer = bytearray()
-        self.batch_size = self.chunk_size_bytes * 3  # Moderate batching (90ms)
-        self.last_batch_time = time.time()
-        self.batch_timeout = 0.030  # Balanced timeout (30ms)
+        self.max_queue_size = 50  # Limit queue size to prevent excessive buffering
 
         # WebRTC stats debugging
         self.last_stats_time = 0
@@ -50,16 +42,12 @@ class AgentAudioTrack(AudioStreamTrack):
         self.buffer_empty_count = 0
         self.start_time = time.time()
 
-        # Moderate timing for consistent audio frame rate
-        self.target_fps = 60.0  # Moderate increase from 50 to 60 FPS (16.7ms intervals)
-
-        # Conservative adaptive buffering
-        self.buffer_empty_threshold = 0.5  # Trigger buffer increase if >50% empty rate (less aggressive)
-        self.buffer_adjustment_factor = 1.2  # Smaller adjustment factor (20% increase)
+        # Simple timing based on AWS documentation
+        self.target_sleep = 0.01  # 10ms sleep like AWS example
 
         logger.info(
             f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms), "
-            f"target_fps: {self.target_fps}, min_buffer: {self.min_buffer_threshold} bytes"
+            f"queue-based approach (AWS documentation style)"
         )
 
     def set_peer_connection(self, pc):
@@ -80,67 +68,38 @@ class AgentAudioTrack(AudioStreamTrack):
             avg_throughput = self.bytes_processed / uptime if uptime > 0 else 0
             buffer_empty_rate = self.buffer_empty_count / self.frames_sent if self.frames_sent > 0 else 0
 
-            # Get current batch buffer size for stats
-            batch_buffer_size = len(self.batch_buffer)
-
-            # Enhanced stats with buffer health and adaptive info
-            current_buffer_size = len(self.audio_buffer)
-            buffer_health = (current_buffer_size / self.min_buffer_threshold) * 100 if self.min_buffer_threshold > 0 else 0
+            # Get current queue size for stats
+            queue_size = self.audio_queue.qsize()
 
             logger.debug(
                 f"📊 Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
                 f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
-                f"Buffer empty rate: {buffer_empty_rate:.2%}, Buffer health: {buffer_health:.0f}%, "
-                f"Min threshold: {self.min_buffer_threshold} bytes, Batch: {batch_buffer_size} bytes"
+                f"Buffer empty rate: {buffer_empty_rate:.2%}, Queue size: {queue_size}/{self.max_queue_size}"
             )
 
     async def recv(self):
-        """Generate and return audio frames from Nova responses - back to basics"""
+        """Generate and return audio frames from Nova responses - AWS documentation approach"""
         try:
             # Print debug stats periodically
             await self._print_debug_stats()
 
-            # Check if we need to flush batch due to timeout
-            current_time = time.time()
-            if len(self.batch_buffer) > 0 and current_time - self.last_batch_time >= self.batch_timeout:
-                await self.flush_batch()
-
-            # Capture buffer size for timing logic
-            buffer_was_empty = False
-
-            async with self.buffer_lock:
-                buffer_size = len(self.audio_buffer)
-                if buffer_size >= self.chunk_size_bytes:
-                    # Extract a chunk from the buffer
-                    chunk_data = bytes(self.audio_buffer[: self.chunk_size_bytes])
-                    del self.audio_buffer[: self.chunk_size_bytes]
-                    logger.debug(f"🔊 Playing audio: {len(chunk_data)} bytes, {len(self.audio_buffer)} remaining")
-                elif buffer_size > 0:
-                    # Only use remaining data if we have enough, otherwise wait for more
-                    if buffer_size >= self.min_buffer_threshold or buffer_size > self.chunk_size_bytes // 2:
-                        remaining_data = bytes(self.audio_buffer)
-                        self.audio_buffer.clear()
-                        padding_needed = self.chunk_size_bytes - len(remaining_data)
-                        chunk_data = remaining_data + bytes(padding_needed)
-                        logger.debug(f"🔊 Playing remaining audio: used {len(remaining_data)} bytes + {padding_needed} silence")
-                    else:
-                        # Wait for more data to avoid gaps
-                        chunk_data = bytes(self.chunk_size_bytes)
-                        buffer_was_empty = True
-                        logger.debug(f"🔊 Waiting for more audio data: {buffer_size} bytes available, need {self.min_buffer_threshold}")
-                else:
-                    # Generate silence if no data at all
-                    chunk_data = bytes(self.chunk_size_bytes)
-                    buffer_was_empty = True
+            # Simple queue-based approach like AWS documentation
+            try:
+                # Try to get audio data from queue with a short timeout
+                audio_data = await asyncio.wait_for(self.audio_queue.get(), timeout=0.001)
+                logger.debug(f"🔊 Playing audio: {len(audio_data)} bytes from queue")
+            except asyncio.TimeoutError:
+                # No audio available, generate silence
+                audio_data = bytes(self.chunk_size_bytes)
+                self.buffer_empty_count += 1
+                logger.debug(f"🔊 No audio in queue, generating silence: {len(audio_data)} bytes")
 
             # Track performance metrics
             self.frames_sent += 1
-            self.bytes_processed += len(chunk_data)
-            if buffer_was_empty:
-                self.buffer_empty_count += 1
+            self.bytes_processed += len(audio_data)
 
             # Convert bytes to numpy array
-            audio_array = np.frombuffer(chunk_data, dtype=np.int16)
+            audio_array = np.frombuffer(audio_data, dtype=np.int16)
 
             # Update video throb level based on this audio chunk
             if self.agent_video_track and len(audio_array) > 0:
@@ -160,27 +119,8 @@ class AgentAudioTrack(AudioStreamTrack):
             # Update frame count
             self.frame_count += len(audio_array)
 
-            # Conservative timing adjustments for production stability
-            target_sleep = 0.012  # Slight reduction from 15ms to 12ms (conservative)
-
-            # Conservative adaptive buffering - only adjust if severely problematic
-            if self.frames_sent > 200:  # Wait longer for stable calculation
-                empty_rate = self.buffer_empty_count / self.frames_sent
-                if empty_rate > self.buffer_empty_threshold and self.min_buffer_threshold < self.chunk_size_bytes * 4:
-                    # Only increase if not already too large
-                    old_threshold = self.min_buffer_threshold
-                    self.min_buffer_threshold = int(self.min_buffer_threshold * self.buffer_adjustment_factor)
-                    logger.info(
-                        f"🔧 Adaptive buffering: increased threshold from {old_threshold} to {self.min_buffer_threshold} bytes (empty rate: {empty_rate:.2%})"
-                    )
-
-            # Simple timing logic - avoid over-optimization
-            if buffer_was_empty:
-                # When buffer is empty, sleep a bit longer to reduce CPU usage
-                await asyncio.sleep(target_sleep * 1.2)
-            else:
-                # Normal operation
-                await asyncio.sleep(target_sleep)
+            # Simple timing like AWS documentation
+            await asyncio.sleep(self.target_sleep)
 
             return frame
 
@@ -189,76 +129,37 @@ class AgentAudioTrack(AudioStreamTrack):
             raise
 
     async def add_audio_data(self, audio_data: bytes):
-        """Add audio data to the batch buffer for efficient processing"""
+        """Add audio data to queue - AWS documentation approach"""
         try:
-            async with self.buffer_lock:
-                old_buffer_size = len(self.audio_buffer)
+            # Validate audio data
+            if not audio_data or len(audio_data) == 0:
+                return
 
-                # Validate audio data
-                if not audio_data or len(audio_data) == 0:
-                    return
-
-                # Add to batch buffer first
-                self.batch_buffer.extend(audio_data)
-                current_time = time.time()
-
-                # Process batch if it's large enough or timeout reached
-                should_process_batch = len(self.batch_buffer) >= self.batch_size or (
-                    len(self.batch_buffer) > 0 and current_time - self.last_batch_time >= self.batch_timeout
-                )
-
-                if should_process_batch:
-                    # Move batched data to main buffer
-                    batch_data = bytes(self.batch_buffer)
-                    self.batch_buffer.clear()
-                    self.last_batch_time = current_time
-
-                    self.audio_buffer.extend(batch_data)
-                    new_buffer_size = len(self.audio_buffer)
-
-                    # Log batch processing with buffer health info
-                    if old_buffer_size == 0 and new_buffer_size > 0:
-                        logger.info(
-                            f"🎵 Audio started: +{len(batch_data)} bytes (batched), buffer health: {new_buffer_size}/{self.min_buffer_threshold}"
-                        )
-                    else:
-                        # Calculate buffer health percentage
-                        buffer_health = (new_buffer_size / self.min_buffer_threshold) * 100
-                        logger.debug(f"🎵 Batch processed: +{len(batch_data)} bytes, buffer: {new_buffer_size} bytes ({buffer_health:.0f}% health)")
-
-                    # Prevent buffer from growing too large
-                    if len(self.audio_buffer) > self.max_buffer_size:
-                        # Remove oldest data more conservatively
-                        excess = len(self.audio_buffer) - (self.max_buffer_size // 2)
-                        del self.audio_buffer[:excess]
-                        logger.warning(f"Audio buffer too large, removed {excess} bytes")
-                else:
-                    # Just accumulating in batch buffer
-                    logger.debug(f"🎵 Batching: {len(self.batch_buffer)}/{self.batch_size} bytes")
+            # Simple queue approach like AWS documentation
+            if self.audio_queue.qsize() < self.max_queue_size:
+                await self.audio_queue.put(audio_data)
+                logger.debug(f"🎵 Audio queued: +{len(audio_data)} bytes, queue size: {self.audio_queue.qsize()}")
+            else:
+                # Queue is full, drop oldest data to prevent excessive latency
+                try:
+                    self.audio_queue.get_nowait()  # Remove oldest
+                    await self.audio_queue.put(audio_data)  # Add new
+                    logger.debug(f"🎵 Audio queue full, replaced oldest: +{len(audio_data)} bytes")
+                except asyncio.QueueEmpty:
+                    await self.audio_queue.put(audio_data)
 
         except Exception as e:
             logger.error(f"Error adding audio data: {e}")
 
-    async def flush_batch(self):
-        """Force process any remaining batched audio data"""
-        try:
-            async with self.buffer_lock:
-                if len(self.batch_buffer) > 0:
-                    batch_data = bytes(self.batch_buffer)
-                    self.batch_buffer.clear()
-                    self.last_batch_time = time.time()
-
-                    self.audio_buffer.extend(batch_data)
-                    logger.debug(f"🎵 Batch flushed: +{len(batch_data)} bytes")
-        except Exception as e:
-            logger.error(f"Error flushing batch: {e}")
-
     async def stop_current_audio(self):
-        """Stop current audio playback by clearing the buffer (for interruptions)"""
-        async with self.buffer_lock:
-            self.audio_buffer.clear()
-            self.batch_buffer.clear()  # Clear batch buffer too
-            logger.info("🛑 Audio buffer cleared due to interruption")
+        """Stop current audio playback by clearing the queue (for interruptions)"""
+        # Clear the audio queue
+        while not self.audio_queue.empty():
+            try:
+                self.audio_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        logger.info("🛑 Audio queue cleared due to interruption")
 
         # Reset video throb to idle state
         if self.agent_video_track:
@@ -266,6 +167,9 @@ class AgentAudioTrack(AudioStreamTrack):
 
     async def stop(self):
         """Stop the audio track"""
-        async with self.buffer_lock:
-            self.audio_buffer.clear()
-            self.batch_buffer.clear()  # Clear batch buffer too
+        # Clear the audio queue
+        while not self.audio_queue.empty():
+            try:
+                self.audio_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
