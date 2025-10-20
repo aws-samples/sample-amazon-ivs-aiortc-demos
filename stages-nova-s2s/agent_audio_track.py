@@ -22,21 +22,21 @@ class AgentAudioTrack(AudioStreamTrack):
         self.channels = channels
         self.agent_video_track = agent_video_track  # Reference to update throb
 
-        # Larger chunks for smoother playback - reduces gaps
-        self.chunk_size_bytes = 480 * 2  # 480 samples * 2 bytes per sample (20ms at 24kHz)
+        # Larger chunks for smoother playback - optimized for production
+        self.chunk_size_bytes = 960 * 4  # Increased from 960 to 3840 bytes (80ms at 24kHz)
 
-        # Buffer management with minimum threshold
+        # Buffer management with minimum threshold - increased for production stability
         self.audio_buffer = bytearray()
         self.buffer_lock = asyncio.Lock()
         self.frame_count = 0
         self.max_buffer_size = sample_rate * 2 * 60  # 60 seconds max
-        self.min_buffer_threshold = self.chunk_size_bytes * 3  # Keep 3 chunks minimum
+        self.min_buffer_threshold = self.chunk_size_bytes * 5  # Keep 5 chunks minimum (increased from 3)
 
-        # Audio batching for performance
+        # Audio batching for performance - optimized for production
         self.batch_buffer = bytearray()
-        self.batch_size = self.chunk_size_bytes * 4  # Batch 4 chunks at a time (80ms)
+        self.batch_size = self.chunk_size_bytes * 2  # Smaller batches for faster processing (reduced from 4)
         self.last_batch_time = time.time()
-        self.batch_timeout = 0.040  # Force batch processing after 40ms max
+        self.batch_timeout = 0.020  # Reduced from 40ms to 20ms for faster processing
 
         # WebRTC stats debugging
         self.last_stats_time = 0
@@ -50,11 +50,16 @@ class AgentAudioTrack(AudioStreamTrack):
         self.buffer_empty_count = 0
         self.start_time = time.time()
 
-        # Fixed timing for consistent audio frame rate
-        self.target_fps = 50.0  # Target 50 FPS (20ms chunks)
+        # Fixed timing for consistent audio frame rate - optimized for production
+        self.target_fps = 100.0  # Increased from 50 to 100 FPS (10ms chunks) for smoother playback
+
+        # Adaptive buffering for production stability
+        self.buffer_empty_threshold = 0.3  # Trigger buffer increase if >30% empty rate
+        self.buffer_adjustment_factor = 1.5  # Factor to increase buffer when needed
 
         logger.info(
-            f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms)"
+            f"🔊 AgentAudioTrack initialized - chunk_size: {self.chunk_size_bytes} bytes (~{self.chunk_size_bytes//2/sample_rate*1000:.1f}ms), "
+            f"target_fps: {self.target_fps}, min_buffer: {self.min_buffer_threshold} bytes"
         )
 
     def set_peer_connection(self, pc):
@@ -78,10 +83,15 @@ class AgentAudioTrack(AudioStreamTrack):
             # Get current batch buffer size for stats
             batch_buffer_size = len(self.batch_buffer)
 
+            # Enhanced stats with buffer health and adaptive info
+            current_buffer_size = len(self.audio_buffer)
+            buffer_health = (current_buffer_size / self.min_buffer_threshold) * 100 if self.min_buffer_threshold > 0 else 0
+
             logger.debug(
                 f"📊 Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
                 f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
-                f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
+                f"Buffer empty rate: {buffer_empty_rate:.2%}, Buffer health: {buffer_health:.0f}%, "
+                f"Min threshold: {self.min_buffer_threshold} bytes, Batch: {batch_buffer_size} bytes"
             )
 
     async def recv(self):
@@ -150,19 +160,32 @@ class AgentAudioTrack(AudioStreamTrack):
             # Update frame count
             self.frame_count += len(audio_array)
 
-            # Fixed timing to maintain proper audio frame rate
-            # For 24kHz audio with 20ms chunks (480 samples), we should target 50 FPS
-            # Only sleep if we're running at or above target FPS to avoid slowing down low FPS streams
-            target_sleep = 0.015  # 20ms = 50 FPS
+            # Adaptive timing for production stability
+            # Calculate target sleep based on current FPS and buffer state
+            target_sleep = 0.010  # Reduced from 15ms to 10ms for more responsive audio
 
-            if self.avg_fps >= 50:
+            # Implement adaptive buffering - increase buffer size if empty rate is high
+            if self.frames_sent > 100:  # Only after some frames for stable calculation
+                empty_rate = self.buffer_empty_count / self.frames_sent
+                if empty_rate > self.buffer_empty_threshold:
+                    # Increase buffer threshold to reduce empty rate
+                    old_threshold = self.min_buffer_threshold
+                    self.min_buffer_threshold = int(self.min_buffer_threshold * self.buffer_adjustment_factor)
+                    logger.info(
+                        f"🔧 Adaptive buffering: increased threshold from {old_threshold} to {self.min_buffer_threshold} bytes (empty rate: {empty_rate:.2%})"
+                    )
+
+            # Adaptive sleep timing based on buffer state and FPS
+            if self.avg_fps >= self.target_fps:
                 if buffer_was_empty:
-                    # When buffer is empty, we can sleep a bit longer to reduce CPU usage
-                    await asyncio.sleep(target_sleep)
+                    # When buffer is empty, sleep slightly longer to allow buffer to fill
+                    await asyncio.sleep(target_sleep * 1.5)
                 else:
-                    # When we have audio data, maintain precise timing
+                    # Normal operation - maintain precise timing
                     await asyncio.sleep(target_sleep)
-            # If FPS < 50, don't sleep - let it run as fast as possible to catch up
+            else:
+                # If FPS is low, reduce sleep time to catch up
+                await asyncio.sleep(target_sleep * 0.5)
 
             return frame
 
@@ -198,11 +221,15 @@ class AgentAudioTrack(AudioStreamTrack):
                     self.audio_buffer.extend(batch_data)
                     new_buffer_size = len(self.audio_buffer)
 
-                    # Log batch processing
+                    # Log batch processing with buffer health info
                     if old_buffer_size == 0 and new_buffer_size > 0:
-                        logger.info(f"🎵 Audio started: +{len(batch_data)} bytes (batched)")
+                        logger.info(
+                            f"🎵 Audio started: +{len(batch_data)} bytes (batched), buffer health: {new_buffer_size}/{self.min_buffer_threshold}"
+                        )
                     else:
-                        logger.debug(f"🎵 Batch processed: +{len(batch_data)} bytes, buffer: {new_buffer_size} bytes")
+                        # Calculate buffer health percentage
+                        buffer_health = (new_buffer_size / self.min_buffer_threshold) * 100
+                        logger.debug(f"🎵 Batch processed: +{len(batch_data)} bytes, buffer: {new_buffer_size} bytes ({buffer_health:.0f}% health)")
 
                     # Prevent buffer from growing too large
                     if len(self.audio_buffer) > self.max_buffer_size:
