@@ -14,7 +14,7 @@ class AgentAudioTrack(AudioStreamTrack):
     An audio track that streams Nova speech-to-speech responses - simplified for reliability
     """
 
-    def __init__(self, agent_video_track=None, sample_rate=24000, channels=1, chunk_size=None):
+    def __init__(self, agent_video_track=None, sample_rate=24000, channels=1):
         super().__init__()
 
         # Audio configuration
@@ -29,7 +29,7 @@ class AgentAudioTrack(AudioStreamTrack):
         self.audio_buffer = bytearray()
         self.buffer_lock = asyncio.Lock()
         self.frame_count = 0
-        self.max_buffer_size = sample_rate * 2 * 30  # 30 seconds max
+        self.max_buffer_size = sample_rate * 2 * 60  # 60 seconds max
         self.min_buffer_threshold = self.chunk_size_bytes * 3  # Keep 3 chunks minimum
 
         # Audio batching for performance
@@ -60,7 +60,7 @@ class AgentAudioTrack(AudioStreamTrack):
     def set_peer_connection(self, pc):
         """Set the peer connection for stats collection"""
         self.peer_connection = pc
-        logger.info(f"🔗 Peer connection set for WebRTC stats: {pc is not None}")
+        logger.debug(f"🔗 Peer connection set for WebRTC stats: {pc is not None}")
 
     async def _print_debug_stats(self):
         """Print WebRTC and performance stats every 5 seconds"""
@@ -78,7 +78,7 @@ class AgentAudioTrack(AudioStreamTrack):
             # Get current batch buffer size for stats
             batch_buffer_size = len(self.batch_buffer)
 
-            logger.info(
+            logger.debug(
                 f"📊 Audio Stats - Uptime: {uptime:.1f}s, Frames: {self.frames_sent}, "
                 f"FPS: {avg_fps:.1f}, Throughput: {avg_throughput/1024:.1f}KB/s, "
                 f"Buffer empty rate: {buffer_empty_rate:.2%}, Batch: {batch_buffer_size} bytes"
@@ -104,7 +104,7 @@ class AgentAudioTrack(AudioStreamTrack):
                     # Extract a chunk from the buffer
                     chunk_data = bytes(self.audio_buffer[: self.chunk_size_bytes])
                     del self.audio_buffer[: self.chunk_size_bytes]
-                    # logger.info(f"🔊 Playing audio: {len(chunk_data)} bytes, {len(self.audio_buffer)} remaining")
+                    logger.debug(f"🔊 Playing audio: {len(chunk_data)} bytes, {len(self.audio_buffer)} remaining")
                 elif buffer_size > 0:
                     # Only use remaining data if we have enough, otherwise wait for more
                     if buffer_size >= self.min_buffer_threshold or buffer_size > self.chunk_size_bytes // 2:
@@ -112,7 +112,7 @@ class AgentAudioTrack(AudioStreamTrack):
                         self.audio_buffer.clear()
                         padding_needed = self.chunk_size_bytes - len(remaining_data)
                         chunk_data = remaining_data + bytes(padding_needed)
-                        # logger.info(f"🔊 Playing remaining audio: used {len(remaining_data)} bytes + {padding_needed} silence")
+                        logger.debug(f"🔊 Playing remaining audio: used {len(remaining_data)} bytes + {padding_needed} silence")
                     else:
                         # Wait for more data to avoid gaps
                         chunk_data = bytes(self.chunk_size_bytes)
