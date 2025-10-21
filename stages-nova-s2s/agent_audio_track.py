@@ -29,7 +29,7 @@ class AgentAudioTrack(AudioStreamTrack):
         self.audio_buffer = bytearray()
         self.buffer_lock = asyncio.Lock()
         self.frame_count = 0
-        self.max_buffer_size = sample_rate * 2 * 30  # 30 seconds max
+        self.max_buffer_size = sample_rate * 2 * 60  # 60 seconds max
         self.min_buffer_threshold = self.chunk_size_bytes * 3  # Keep 3 chunks minimum
 
         # Audio batching for performance - same as GPT
