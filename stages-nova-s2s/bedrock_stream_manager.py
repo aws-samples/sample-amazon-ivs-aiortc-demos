@@ -32,7 +32,7 @@ class BedrockStreamManager:
         self,
         agent_audio_track: AgentAudioTrack,
         agent_video_track: AgentVideoTrack,
-        model_id="amazon.nova-sonic-v1:0",
+        model_id="amazon.nova-2-sonic-v1:0",
         region="us-east-1",
         input_sample_rate=16000,
         weather_api_key=None,

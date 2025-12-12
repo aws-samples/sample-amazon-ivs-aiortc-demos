@@ -457,7 +457,7 @@ def parse_args():
     parser.add_argument("--subscribe-to", required=True, help="Participant ID to subscribe to")
 
     # Nova options
-    parser.add_argument("--nova-model-id", default="amazon.nova-sonic-v1:0", help="Nova model ID")
+    parser.add_argument("--nova-model-id", default="amazon.nova-2-sonic-v1:0", help="Nova model ID")
     parser.add_argument("--nova-region", default="us-east-1", help="AWS region for Nova")
 
     # Frame analysis options
