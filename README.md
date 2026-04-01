@@ -17,6 +17,7 @@ A comprehensive collection of Python demo scripts demonstrating various Amazon I
   - [Stages Subscribe](#stages-subscribe)
   - [Stages Nova Speech-to-Speech](#stages-nova-speech-to-speech)
   - [Stages OpenAI Real-time API](#stages-openai-real-time-api)
+  - [Stages Deepgram Voice Agent](#stages-deepgram-voice-agent)
   - [Stages SEI Publishing](#stages-sei-publishing)
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
@@ -78,6 +79,10 @@ amazon-ivs-python-demos/
 │   └── ivs-stage-nova-s2s.py                          # Nova Sonic integration
 ├── stages-gpt-realtime/                                    # GPT RealTime API
 │   └── ivs-stage-gpt-realtime.py                       # gpt-realtime integration
+├── stages-deepgram-agent/                                  # Deepgram Voice Agent
+│   ├── ivs-stage-deepgram-agent.py                     # Deepgram Agent integration
+│   ├── ivs-stage-deepgram-agent-manager.py             # Multi-instance manager via IVS Chat
+│   └── deepgram_agent_manager.py                       # Deepgram Agent WebSocket manager
 └── stages_sei/                                         # SEI Publishing System
     ├── SEI.md                                          # SEI documentation and usage guide
     ├── sei_publisher.py                                # High-level SEI message publishing
@@ -818,6 +823,119 @@ python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --openai-key "sk-..."
 ```
 
+### Stages Deepgram Voice Agent
+
+The `stages-deepgram-agent/` directory contains a conversational AI voice agent powered by [Deepgram's Voice Agent API](https://developers.deepgram.com/docs/voice-agent), integrated with IVS Real-Time Stages.
+
+Unlike the Nova S2S and GPT Real-time demos which use separate STT and TTS pipelines, Deepgram's Voice Agent API handles the entire voice conversation loop — speech-to-text, LLM reasoning, and text-to-speech — through a single WebSocket connection.
+
+#### ivs-stage-deepgram-agent.py
+
+**Features:**
+
+- Single WebSocket for the full STT → LLM → TTS pipeline
+- Bidirectional audio streaming with IVS participants
+- Configurable LLM provider (OpenAI, Anthropic, Groq)
+- Multiple Deepgram Aura TTS voices (50+ options)
+- Real-time audio visualization (reuses proven AgentVideoTrack)
+- Automatic barge-in / interruption handling
+- Conversation transcript logging
+- Custom system prompts and greeting messages
+
+**Usage:**
+
+```bash
+cd stages-deepgram-agent
+
+# Basic conversation
+python ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# Custom voice and LLM
+python ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --voice "aura-2-orion-en" \
+  --think-model "gpt-4o"
+
+# Custom personality
+python ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --prompt "You are a pirate. Respond in pirate speak." \
+  --greeting "Ahoy! What can I do for ye?"
+```
+
+**Command-line Arguments:**
+
+- `--token`: JWT participant token with both publish and subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--deepgram-api-key`: Deepgram API key (or set `DEEPGRAM_API_KEY` env var)
+- `--voice`: Deepgram TTS voice model (default: "aura-2-asteria-en")
+- `--think-model`: LLM model for reasoning (default: "gpt-4o-mini")
+- `--think-provider`: LLM provider — "open_ai", "anthropic", "groq" (default: "open_ai")
+- `--prompt`: System prompt for the agent personality
+- `--greeting`: Greeting message spoken when the session starts
+- `--language`: Language code (default: "en")
+- `--ice-timeout`: ICE gathering timeout in seconds (default: 1)
+
+**Key Components:**
+
+1. **DeepgramAgentManager**: Manages the Voice Agent WebSocket — settings, audio streaming, event handling
+2. **AgentAudioTrack**: Buffers Deepgram TTS audio and streams it to IVS via WebRTC (reused from Nova demo)
+3. **AgentVideoTrack**: Visual feedback with throbbing circle animation (reused from Nova demo)
+
+**How It Compares:**
+
+| Feature               | Nova S2S              | GPT Real-time     | Deepgram Agent                         |
+| --------------------- | --------------------- | ----------------- | -------------------------------------- |
+| STT                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Nova-3                        |
+| LLM                   | Nova Sonic (built-in) | GPT-4o (built-in) | Configurable (OpenAI, Anthropic, Groq) |
+| TTS                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Aura (50+ voices)             |
+| WebSocket Connections | 1 (Bedrock)           | 1 (OpenAI)        | 1 (Deepgram)                           |
+| AWS Dependency        | Yes (Bedrock)         | No                | No                                     |
+| LLM Flexibility       | Fixed                 | Fixed             | Swappable                              |
+
+**Prerequisites:**
+
+- Deepgram API key — sign up at [deepgram.com](https://deepgram.com/)
+- IVS stage token with both publish and subscribe capabilities
+
+**Environment Variables:**
+
+```bash
+export DEEPGRAM_API_KEY="your-deepgram-api-key"
+```
+
+#### Deepgram Agent Manager
+
+For automated management of multiple Deepgram Agent instances via WebSocket integration with IVS Chat, use `ivs-stage-deepgram-agent-manager.py`. This companion tool dynamically launches and manages agent instances based on chat messages, with full control over voice, LLM provider/model, prompt, and greeting.
+
+```bash
+python stages-deepgram-agent/ivs-stage-deepgram-agent-manager.py \
+  --chat-room-arn "arn:aws:ivschat:us-east-1:123456789012:room/abcdefgh" \
+  --ws-endpoint "wss://edge.ivschat.us-east-1.amazonaws.com" \
+  --verbose
+```
+
+Chat message payload to launch an agent:
+
+```json
+{
+  "action": "LAUNCH_ASSISTANT",
+  "stageArn": "arn:aws:ivs:us-east-1:123456789012:stage/abcdefgh",
+  "participantId": "participant-123",
+  "voice": "aura-2-asteria-en",
+  "thinkProvider": "open_ai",
+  "thinkModel": "gpt-4o-mini",
+  "prompt": "You are a friendly assistant.",
+  "greeting": "Hello!"
+}
+```
+
+For detailed documentation including all voices, SEI transcript format, troubleshooting, and frontend integration examples, see **[`stages-deepgram-agent/README.md`](stages-deepgram-agent/README.md)**.
+
 ### Stages SEI Publishing
 
 The `stages_sei/` directory contains a comprehensive SEI (Supplemental Enhancement Information) publishing system for embedding metadata directly into H.264 video streams.
@@ -1136,6 +1254,36 @@ python stages-gpt-realtime/ivs-stage-openai-realtime.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --ice-timeout 1
+```
+
+#### Deepgram Voice Agent Examples
+
+```bash
+# Basic Deepgram voice agent conversation
+python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# With custom voice and GPT-4o
+python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --voice "aura-2-orion-en" \
+  --think-model "gpt-4o"
+
+# With Anthropic Claude as the LLM
+python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --think-provider "anthropic" \
+  --think-model "claude-sonnet-4-20250514"
+
+# Custom personality
+python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --prompt "You are a sports commentator. Be energetic and exciting." \
+  --greeting "Welcome to the show!"
 ```
 
 #### Publish and Subscribe Example
