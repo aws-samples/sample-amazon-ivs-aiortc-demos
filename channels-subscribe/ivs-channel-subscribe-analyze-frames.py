@@ -22,7 +22,7 @@ logger.setLevel(logging.DEBUG)
 class VideoFrameAnalyzer:
     """Handles video frame analysis using Amazon Bedrock Claude"""
 
-    def __init__(self, analysis_interval: float = 30.0, region: str = "us-east-1", model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"):
+    def __init__(self, analysis_interval: float = 30.0, region: str = "us-east-1", model_id: str = "us.anthropic.claude-sonnet-4-6"):
         """
         Initialize the video frame analyzer
 
@@ -246,8 +246,8 @@ def parse_args():
     parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
     parser.add_argument(
         "--bedrock-model-id",
-        default="us.anthropic.claude-sonnet-4-20250514-v1:0",
-        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
+        default="us.anthropic.claude-sonnet-4-6",
+        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-6)",
     )
     parser.add_argument("--disable-analysis", action="store_true", help="Disable video frame analysis")
 

@@ -38,7 +38,7 @@ class BedrockStreamManager:
         weather_api_key=None,
         brave_api_key=None,
         enable_frame_analysis=True,
-        analysis_model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        analysis_model_id="us.anthropic.claude-sonnet-4-6",
         analysis_region="us-east-1",
     ):
         self.model_id = model_id

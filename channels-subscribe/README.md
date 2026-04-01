@@ -6,45 +6,45 @@ A comprehensive Python toolkit for subscribing to and analyzing Amazon IVS (Inte
 
 ### Channel Subscription & Analysis
 
--   **Frame Analysis**: Analyze individual video frames using Amazon Bedrock Claude
--   **Video Analysis**: Process video segments using TwelveLabs Pegasus for comprehensive content analysis
--   **Audio/Video Analysis**: Combined audio and video processing with proper synchronization
--   **Real-Time Transcription**: Live speech-to-text using OpenAI Whisper
--   **Timed Metadata Publishing**: Publish analysis results back to IVS as timed metadata
--   **Rendition Selection**: Automatic or manual selection of stream quality
+- **Frame Analysis**: Analyze individual video frames using Amazon Bedrock Claude
+- **Video Analysis**: Process video segments using TwelveLabs Pegasus for comprehensive content analysis
+- **Audio/Video Analysis**: Combined audio and video processing with proper synchronization
+- **Real-Time Transcription**: Live speech-to-text using OpenAI Whisper
+- **Timed Metadata Publishing**: Publish analysis results back to IVS as timed metadata
+- **Rendition Selection**: Automatic or manual selection of stream quality
 
 ## 📋 Requirements
 
--   Python 3.8+
--   AWS credentials configured (for Bedrock analysis)
--   OpenCV (optional, for video display)
+- Python 3.8+
+- AWS credentials configured (for Bedrock analysis)
+- OpenCV (optional, for video display)
 
 ## 🛠 Installation
 
 1. **Clone the repository:**
 
-    ```bash
-    git clone <repository-url>
-    cd amazon-ivs-python-demos
-    ```
+   ```bash
+   git clone <repository-url>
+   cd amazon-ivs-python-demos
+   ```
 
 2. **Install Python dependencies:**
 
-    ```bash
-    pip install -r ../requirements.txt
-    ```
+   ```bash
+   pip install -r ../requirements.txt
+   ```
 
 > [!NOTE]
 > The `requirements.txt` file is located in the root directory of the project and contains dependencies for all sub-projects.
 
 3. **Configure AWS credentials** (for Bedrock analysis):
-    ```bash
-    aws configure
-    # or set environment variables:
-    export AWS_ACCESS_KEY_ID=your_access_key
-    export AWS_SECRET_ACCESS_KEY=your_secret_key
-    export AWS_DEFAULT_REGION=us-east-1
-    ```
+   ```bash
+   aws configure
+   # or set environment variables:
+   export AWS_ACCESS_KEY_ID=your_access_key
+   export AWS_SECRET_ACCESS_KEY=your_secret_key
+   export AWS_DEFAULT_REGION=us-east-1
+   ```
 
 ## 📁 Project Structure
 
@@ -73,21 +73,21 @@ Analyzes individual video frames at configurable intervals using Amazon Bedrock 
 
 **Key Features:**
 
--   Frame-by-frame analysis with Claude Sonnet
--   Configurable analysis intervals (default: 30 seconds)
--   Optional video display
--   Rendition quality selection
+- Frame-by-frame analysis with Claude Sonnet
+- Configurable analysis intervals (default: 30 seconds)
+- Optional video display
+- Rendition quality selection
 
 **Arguments:**
 
--   `--playlist-url` (required): M3U8 playlist URL
--   `--show-video`: Display video frames in a window
--   `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
--   `--bedrock-region`: AWS region for Bedrock service (default: us-east-1)
--   `--bedrock-model-id`: Claude model ID (default: us.anthropic.claude-sonnet-4-20250514-v1:0)
--   `--disable-analysis`: Disable video frame analysis
--   `--highest-quality`: Auto-select highest quality rendition
--   `--lowest-quality`: Auto-select lowest quality rendition
+- `--playlist-url` (required): M3U8 playlist URL
+- `--show-video`: Display video frames in a window
+- `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
+- `--bedrock-region`: AWS region for Bedrock service (default: us-east-1)
+- `--bedrock-model-id`: Claude model ID (default: us.anthropic.claude-sonnet-4-6)
+- `--disable-analysis`: Disable video frame analysis
+- `--highest-quality`: Auto-select highest quality rendition
+- `--lowest-quality`: Auto-select lowest quality rendition
 
 **Usage:**
 
@@ -114,21 +114,21 @@ Records and analyzes video segments using TwelveLabs Pegasus for comprehensive c
 
 **Key Features:**
 
--   Records video chunks (default: 10 seconds)
--   Encodes to MP4 for analysis
--   Uses TwelveLabs Pegasus model
--   OpenCV-based video capture
+- Records video chunks (default: 10 seconds)
+- Encodes to MP4 for analysis
+- Uses TwelveLabs Pegasus model
+- OpenCV-based video capture
 
 **Arguments:**
 
--   `--playlist-url` (required): M3U8 playlist URL
--   `--show-video`: Display video frames in a window
--   `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
--   `--bedrock-region`: AWS region for Bedrock service (default: us-west-2)
--   `--bedrock-model-id`: Pegasus model ID (default: us.twelvelabs.pegasus-1-2-v1:0)
--   `--disable-analysis`: Disable video analysis
--   `--highest-quality`: Auto-select highest quality rendition
--   `--lowest-quality`: Auto-select lowest quality rendition
+- `--playlist-url` (required): M3U8 playlist URL
+- `--show-video`: Display video frames in a window
+- `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
+- `--bedrock-region`: AWS region for Bedrock service (default: us-west-2)
+- `--bedrock-model-id`: Pegasus model ID (default: us.twelvelabs.pegasus-1-2-v1:0)
+- `--disable-analysis`: Disable video analysis
+- `--highest-quality`: Auto-select highest quality rendition
+- `--lowest-quality`: Auto-select lowest quality rendition
 
 **Usage:**
 
@@ -156,21 +156,21 @@ Advanced script that properly handles both audio and video streams using PyAV fo
 
 **Key Features:**
 
--   Native audio/video stream handling with PyAV
--   Proper audio capture and encoding
--   MP4 encoding with H.264 video and AAC audio
--   TwelveLabs Pegasus analysis
+- Native audio/video stream handling with PyAV
+- Proper audio capture and encoding
+- MP4 encoding with H.264 video and AAC audio
+- TwelveLabs Pegasus analysis
 
 **Arguments:**
 
--   `--playlist-url` (required): M3U8 playlist URL
--   `--show-video`: Display video frames in a window (requires OpenCV)
--   `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
--   `--bedrock-region`: AWS region for Bedrock service (default: us-west-2)
--   `--bedrock-model-id`: Pegasus model ID (default: us.twelvelabs.pegasus-1-2-v1:0)
--   `--disable-analysis`: Disable video analysis
--   `--highest-quality`: Auto-select highest quality rendition
--   `--lowest-quality`: Auto-select lowest quality rendition
+- `--playlist-url` (required): M3U8 playlist URL
+- `--show-video`: Display video frames in a window (requires OpenCV)
+- `--analysis-duration`: Duration in seconds for video recording before analysis (default: 10.0)
+- `--bedrock-region`: AWS region for Bedrock service (default: us-west-2)
+- `--bedrock-model-id`: Pegasus model ID (default: us.twelvelabs.pegasus-1-2-v1:0)
+- `--disable-analysis`: Disable video analysis
+- `--highest-quality`: Auto-select highest quality rendition
+- `--lowest-quality`: Auto-select lowest quality rendition
 
 **Usage:**
 
@@ -197,23 +197,23 @@ Live speech-to-text transcription using OpenAI Whisper with support for multiple
 
 **Key Features:**
 
--   Real-time audio transcription
--   Multiple Whisper models (tiny to large-v3)
--   Multi-language support with auto-detection
--   Configurable chunk duration
--   Optional video display
+- Real-time audio transcription
+- Multiple Whisper models (tiny to large-v3)
+- Multi-language support with auto-detection
+- Configurable chunk duration
+- Optional video display
 
 **Arguments:**
 
--   `--playlist-url` (required): M3U8 playlist URL for audio transcription
--   `--whisper-model`: Whisper model to use (tiny, base, small, medium, large, large-v2, large-v3) (default: tiny)
--   `--fp16`: Use 16-bit floating point precision for faster processing (default: true)
--   `--language`: Language for transcription (ISO 639-1 code or 'auto' for detection) (default: en)
--   `--chunk-duration`: Duration in seconds for each audio chunk to transcribe (default: 5)
--   `--show-video`: Display video frames in a window (requires OpenCV)
--   `--publish-transcript-as-timed-metadata`: Publish transcripts as IVS timed metadata to the channel
--   `--highest-quality`: Auto-select highest quality rendition
--   `--lowest-quality`: Auto-select lowest quality rendition
+- `--playlist-url` (required): M3U8 playlist URL for audio transcription
+- `--whisper-model`: Whisper model to use (tiny, base, small, medium, large, large-v2, large-v3) (default: tiny)
+- `--fp16`: Use 16-bit floating point precision for faster processing (default: true)
+- `--language`: Language for transcription (ISO 639-1 code or 'auto' for detection) (default: en)
+- `--chunk-duration`: Duration in seconds for each audio chunk to transcribe (default: 5)
+- `--show-video`: Display video frames in a window (requires OpenCV)
+- `--publish-transcript-as-timed-metadata`: Publish transcripts as IVS timed metadata to the channel
+- `--highest-quality`: Auto-select highest quality rendition
+- `--lowest-quality`: Auto-select lowest quality rendition
 
 **Usage:**
 
@@ -255,11 +255,11 @@ The `channels-subscribe/ivs_metadata_publisher.py` module provides a reusable wa
 
 **Key Features:**
 
--   Automatic channel ARN extraction from M3U8 playlist URLs
--   Rate limiting compliance (5 RPS per channel, 155 RPS per account)
--   Automatic payload splitting for messages > 1KB
--   Graceful error handling and retry logic
--   Support for any type of metadata (transcripts, events, etc.)
+- Automatic channel ARN extraction from M3U8 playlist URLs
+- Rate limiting compliance (5 RPS per channel, 155 RPS per account)
+- Automatic payload splitting for messages > 1KB
+- Graceful error handling and retry logic
+- Support for any type of metadata (transcripts, events, etc.)
 
 **Usage:**
 
@@ -279,27 +279,27 @@ await publisher.publish_metadata(channel_arn, "Custom metadata", "event")
 
 **Rate Limits:**
 
--   Maximum 5 requests per second per channel
--   Maximum 155 requests per second per account
--   Maximum 1KB payload per request (automatically split if larger)
+- Maximum 5 requests per second per channel
+- Maximum 155 requests per second per account
+- Maximum 1KB payload per request (automatically split if larger)
 
 ## 🌍 Supported Languages (Transcription)
 
 The transcription script supports 99+ languages including:
 
--   **English** (`en`) - Default
--   **Spanish** (`es`)
--   **French** (`fr`)
--   **German** (`de`)
--   **Italian** (`it`)
--   **Portuguese** (`pt`)
--   **Russian** (`ru`)
--   **Japanese** (`ja`)
--   **Chinese** (`zh`)
--   **Korean** (`ko`)
--   **Arabic** (`ar`)
--   **Hindi** (`hi`)
--   **Auto-detect** (`auto`)
+- **English** (`en`) - Default
+- **Spanish** (`es`)
+- **French** (`fr`)
+- **German** (`de`)
+- **Italian** (`it`)
+- **Portuguese** (`pt`)
+- **Russian** (`ru`)
+- **Japanese** (`ja`)
+- **Chinese** (`zh`)
+- **Korean** (`ko`)
+- **Arabic** (`ar`)
+- **Hindi** (`hi`)
+- **Auto-detect** (`auto`)
 
 ## 🎥 Whisper Model Comparison
 
@@ -387,26 +387,23 @@ python ivs-channel-subscribe-transcribe.py \
 ### Performance Tips
 
 1. **For real-time transcription:**
-
-    - Use `--whisper-model tiny` or `--whisper-model base`
-    - Enable FP16: `--fp16 true`
-    - Use shorter chunks: `--chunk-duration 3`
+   - Use `--whisper-model tiny` or `--whisper-model base`
+   - Enable FP16: `--fp16 true`
+   - Use shorter chunks: `--chunk-duration 3`
 
 2. **For high accuracy transcription:**
-
-    - Use `--whisper-model large-v3`
-    - Increase chunk duration: `--chunk-duration 10`
-    - Specify language: `--language en` (faster than auto-detect)
+   - Use `--whisper-model large-v3`
+   - Increase chunk duration: `--chunk-duration 10`
+   - Specify language: `--language en` (faster than auto-detect)
 
 3. **For video analysis:**
-
-    - Use `--lowest-quality` for faster processing
-    - Adjust `--analysis-duration` based on content complexity
-    - Run without `--show-video` for headless operation
+   - Use `--lowest-quality` for faster processing
+   - Adjust `--analysis-duration` based on content complexity
+   - Run without `--show-video` for headless operation
 
 4. **For frame analysis:**
-    - Increase `--analysis-interval` for less frequent analysis
-    - Use `--lowest-quality` for faster frame processing
+   - Increase `--analysis-interval` for less frequent analysis
+   - Use `--lowest-quality` for faster frame processing
 
 ### Debug Mode
 
@@ -425,10 +422,10 @@ For issues and questions:
 1. Check the troubleshooting section above
 2. Review the script help: `python script.py --help`
 3. Open an issue on GitHub with:
-    - Script name and version
-    - Full error message
-    - Command used
-    - System information (OS, Python version)
+   - Script name and version
+   - Full error message
+   - Command used
+   - System information (OS, Python version)
 
 ---
 

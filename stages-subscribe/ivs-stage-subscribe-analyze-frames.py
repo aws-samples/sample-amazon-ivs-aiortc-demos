@@ -37,7 +37,7 @@ stun_logger.setLevel(logging.CRITICAL)
 class VideoFrameAnalyzer:
     """Handles video frame analysis using Amazon Bedrock Claude"""
 
-    def __init__(self, analysis_interval: float = 5.0, region: str = "us-east-1", model_id: str = "anthropic.claude-sonnet-4-20250514-v1:0"):
+    def __init__(self, analysis_interval: float = 5.0, region: str = "us-east-1", model_id: str = "us.anthropic.claude-sonnet-4-6"):
         """
         Initialize the video frame analyzer
 
@@ -262,11 +262,7 @@ async def get_remote_sdp(url: str, token: str, sdp_offer: str, max_redirects: in
 
         try:
             response = requests.post(
-                current_url, 
-                data=sdp_offer, 
-                headers=headers, 
-                allow_redirects=False,
-                timeout=10  # Add explicit timeout of 10 seconds
+                current_url, data=sdp_offer, headers=headers, allow_redirects=False, timeout=10  # Add explicit timeout of 10 seconds
             )
 
             if response.status_code in [301, 302, 303, 307, 308]:
@@ -418,8 +414,8 @@ def parse_args():
     parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock service (default: us-east-1)")
     parser.add_argument(
         "--bedrock-model-id",
-        default="us.anthropic.claude-sonnet-4-20250514-v1:0",
-        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
+        default="us.anthropic.claude-sonnet-4-6",
+        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-6)",
     )
     parser.add_argument("--disable-analysis", action="store_true", help="Disable video frame analysis (just subscribe to video)")
 

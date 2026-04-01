@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class AgentTools:
 
-    def __init__(self, region="us-east-1", model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"):
+    def __init__(self, region="us-east-1", model_id: str = "us.anthropic.claude-sonnet-4-6"):
         self.region = region
         self.model_id = model_id
         self.bedrock_client = boto3.client("bedrock-runtime", region_name=self.region)

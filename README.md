@@ -592,12 +592,12 @@ python ivs-stage-subscribe-analyze-frames.py \
 - `--subscribe-to`: Participant ID to subscribe to (required)
 - `--analysis-interval`: Time in seconds between frame analyses (default: 30.0)
 - `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
-- `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--bedrock-model-id`: Bedrock model ID for analysis (default: "us.anthropic.claude-sonnet-4-6")
 - `--disable-analysis`: Disable video frame analysis, just subscribe to video (optional flag)
 
 **Supported Models:**
 
-- **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-20250514-v1:0` - Most capable, best for complex analysis
+- **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-6` - Most capable, best for complex analysis
 - **Claude 3.5 Sonnet**: `anthropic.claude-3-5-sonnet-20241022-v2:0` - Very capable, good balance of performance and cost
 - **Claude 3.5 Haiku**: `anthropic.claude-3-5-haiku-20241022-v1:0` - Fastest and cheapest, good for basic content moderation
 
@@ -684,7 +684,7 @@ python ivs-stage-nova-s2s.py \
 - `--nova-model-id`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
 - `--nova-region`: AWS region for Nova service (default: "us-east-1")
 - `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
-- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-6")
 - `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
 - `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
 - `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
@@ -760,7 +760,7 @@ python ivs-stage-openai-realtime.py \
 - `--voice`: Voice to use for responses - "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar" (default: "cedar")
 - `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
 - `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
-- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
+- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-6")
 - `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5)
 
 **Key Components:**
@@ -837,6 +837,8 @@ Unlike the Nova S2S and GPT Real-time demos which use separate STT and TTS pipel
 - Bidirectional audio streaming with IVS participants
 - Configurable LLM provider (OpenAI, Anthropic, Groq)
 - Multiple Deepgram Aura TTS voices (50+ options)
+- AI-powered video frame analysis via Bedrock Claude (ask "what do you see?")
+- SEI transcript publishing (user and agent text embedded in H.264 video stream)
 - Real-time audio visualization (reuses proven AgentVideoTrack)
 - Automatic barge-in / interruption handling
 - Conversation transcript logging
@@ -879,6 +881,9 @@ python ivs-stage-deepgram-agent.py \
 - `--greeting`: Greeting message spoken when the session starts
 - `--language`: Language code (default: "en")
 - `--ice-timeout`: ICE gathering timeout in seconds (default: 1)
+- `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
+- `--bedrock-model-id`: Bedrock model for frame analysis (default: "us.anthropic.claude-sonnet-4-6")
+- `--bedrock-region`: AWS region for Bedrock (default: "us-east-1")
 
 **Key Components:**
 
@@ -893,8 +898,9 @@ python ivs-stage-deepgram-agent.py \
 | STT                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Nova-3                        |
 | LLM                   | Nova Sonic (built-in) | GPT-4o (built-in) | Configurable (OpenAI, Anthropic, Groq) |
 | TTS                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Aura (50+ voices)             |
+| Vision                | Bedrock Claude (tool) | OpenAI native     | Bedrock Claude (tool)                  |
 | WebSocket Connections | 1 (Bedrock)           | 1 (OpenAI)        | 1 (Deepgram)                           |
-| AWS Dependency        | Yes (Bedrock)         | No                | No                                     |
+| AWS Dependency        | Yes (Bedrock)         | No                | Optional (Bedrock for vision only)     |
 | LLM Flexibility       | Fixed                 | Fixed             | Swappable                              |
 
 **Prerequisites:**
@@ -1276,7 +1282,7 @@ python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --think-provider "anthropic" \
-  --think-model "claude-sonnet-4-20250514"
+  --think-model "claude-sonnet-4-6"
 
 # Custom personality
 python stages-deepgram-agent/ivs-stage-deepgram-agent.py \

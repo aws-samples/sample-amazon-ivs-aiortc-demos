@@ -473,8 +473,8 @@ def parse_args():
     )
     parser.add_argument(
         "--bedrock-model-id",
-        default="us.anthropic.claude-sonnet-4-20250514-v1:0",
-        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-20250514-v1:0)",
+        default="us.anthropic.claude-sonnet-4-6",
+        help="Bedrock model ID for frame analysis (default: us.anthropic.claude-sonnet-4-6)",
     )
 
     # Performance options

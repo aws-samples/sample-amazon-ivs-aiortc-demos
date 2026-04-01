@@ -4,47 +4,47 @@ This script integrates Amazon IVS Real-Time Stages with Amazon Nova Sonic for AI
 
 ## Features
 
--   **Bidirectional Audio Streaming**: Publishes AI responses while subscribing to participant audio
--   **Amazon Nova Sonic Integration**: Real-time conversational AI with speech-to-speech capabilities
--   **Visual Feedback System**:
-    -   Blue throbbing circle when Nova is speaking
-    -   Orange pulsing animation when Nova is thinking/processing
-    -   Audio-reactive visualization during responses
--   **Tool Support**: Built-in tools for date/time, weather information, and video frame analysis
--   **SEI Publishing**: Embeds AI assistant responses directly into H.264 video streams using SEI NAL units
--   **Audio Processing**: Handles resampling between IVS (48kHz) and Nova (16kHz) formats
--   **WebRTC Management**: Proper SDP handling for both publishing and subscribing
--   **Configurable Frame Analysis**: Optional AI-powered video frame analysis using Amazon Bedrock Claude models
+- **Bidirectional Audio Streaming**: Publishes AI responses while subscribing to participant audio
+- **Amazon Nova Sonic Integration**: Real-time conversational AI with speech-to-speech capabilities
+- **Visual Feedback System**:
+  - Blue throbbing circle when Nova is speaking
+  - Orange pulsing animation when Nova is thinking/processing
+  - Audio-reactive visualization during responses
+- **Tool Support**: Built-in tools for date/time, weather information, and video frame analysis
+- **SEI Publishing**: Embeds AI assistant responses directly into H.264 video streams using SEI NAL units
+- **Audio Processing**: Handles resampling between IVS (48kHz) and Nova (16kHz) formats
+- **WebRTC Management**: Proper SDP handling for both publishing and subscribing
+- **Configurable Frame Analysis**: Optional AI-powered video frame analysis using Amazon Bedrock Claude models
 
 ## Prerequisites
 
--   Python 3.8+
--   AWS credentials configured with Bedrock permissions
--   Amazon IVS Real-Time Stage ARN and participant token
--   FFmpeg and PortAudio installed
--   Optional: Weather API key for weather functionality
+- Python 3.8+
+- AWS credentials configured with Bedrock permissions
+- Amazon IVS Real-Time Stage ARN and participant token
+- FFmpeg and PortAudio installed
+- Optional: Weather API key for weather functionality
 
 ## Installation
 
 1. **Install dependencies (located in the root of this repository):**
 
-    ```bash
-    pip install -r ../requirements.txt
-    ```
+   ```bash
+   pip install -r ../requirements.txt
+   ```
 
 2. **Set up environment variables:**
 
-    ```bash
-    export AWS_REGION=us-east-1
-    export AWS_ACCESS_KEY_ID=your_access_key
-    export AWS_SECRET_ACCESS_KEY=your_secret_key
+   ```bash
+   export AWS_REGION=us-east-1
+   export AWS_ACCESS_KEY_ID=your_access_key
+   export AWS_SECRET_ACCESS_KEY=your_secret_key
 
-    # Optional: For weather functionality
-    export WEATHER_API_KEY=your_weather_api_key
+   # Optional: For weather functionality
+   export WEATHER_API_KEY=your_weather_api_key
 
-    # Optional: For web search functionality
-    export BRAVE_API_KEY=your_brave_api_key
-    ```
+   # Optional: For web search functionality
+   export BRAVE_API_KEY=your_brave_api_key
+   ```
 
 ## Usage
 
@@ -60,28 +60,28 @@ python ivs-stage-nova-s2s.py \
 
 #### Required Arguments
 
--   `--token`: JWT participant token with both publish and subscribe capabilities (required)
--   `--subscribe-to`: Participant ID to subscribe to (required)
+- `--token`: JWT participant token with both publish and subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
 
 #### Nova Configuration
 
--   `--nova-model-id`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
--   `--nova-region`: AWS region for Nova service (default: "us-east-1")
+- `--nova-model-id`: Amazon Nova model identifier (default: "amazon.nova-sonic-v1:0")
+- `--nova-region`: AWS region for Nova service (default: "us-east-1")
 
 #### Frame Analysis Configuration
 
--   `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
--   `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-20250514-v1:0")
--   `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
+- `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
+- `--bedrock-model-id`: Bedrock model ID for frame analysis (default: "us.anthropic.claude-sonnet-4-6")
+- `--bedrock-region`: AWS region for Bedrock service (default: "us-east-1")
 
 #### API Configuration
 
--   `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
--   `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
+- `--weather-api-key`: Weather API key for weather tool functionality (overrides WEATHER_API_KEY environment variable)
+- `--brave-api-key`: Brave Search API key for web search tool functionality (overrides BRAVE_API_KEY environment variable)
 
 #### Performance Configuration
 
--   `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
+- `--ice-timeout`: ICE gathering timeout in seconds (default: 1, original: 5) - Lower values speed up connection establishment
 
 ### Example with All Options
 
@@ -91,7 +91,7 @@ python ivs-stage-nova-s2s.py \
   --subscribe-to "participant123" \
   --nova-model-id "amazon.nova-sonic-v1:0" \
   --nova-region "us-east-1" \
-  --bedrock-model-id "us.anthropic.claude-sonnet-4-20250514-v1:0" \
+  --bedrock-model-id "us.anthropic.claude-sonnet-4-6" \
   --bedrock-region "us-east-1" \
   --ice-timeout 1
 ```
@@ -132,13 +132,13 @@ Get current date and time information for specific locations
 
 **Parameters**:
 
--   `location` (required): Location name to get date/time for (e.g., 'New York', 'London', 'Tokyo')
--   `timezone` (optional): Timezone override (e.g., 'America/New_York', 'Europe/London')
+- `location` (required): Location name to get date/time for (e.g., 'New York', 'London', 'Tokyo')
+- `timezone` (optional): Timezone override (e.g., 'America/New_York', 'Europe/London')
 
 **Example conversation**:
 
--   User: "What time is it in New York?"
--   Nova: "It's currently 2:30 PM on Tuesday, July 8th, 2025 in New York (Eastern Daylight Time)."
+- User: "What time is it in New York?"
+- Nova: "It's currently 2:30 PM on Tuesday, July 8th, 2025 in New York (Eastern Daylight Time)."
 
 ### 2. Weather Tool
 
@@ -152,29 +152,29 @@ Get current weather information and 5-day forecast for any location
 
 **Parameters**:
 
--   `location` (required): City name, postal code, or coordinates
+- `location` (required): City name, postal code, or coordinates
 
 **Requirements**:
 
--   `WEATHER_API_KEY` environment variable must be set
--   Uses WeatherAPI.com service
+- `WEATHER_API_KEY` environment variable must be set
+- Uses WeatherAPI.com service
 
 **Example conversation**:
 
--   User: "What's the weather like in New York?"
--   Nova: "The current weather in New York is 75°F with partly cloudy skies. The humidity is 60% with light winds from the southwest. For the next few days, expect highs in the mid-70s with a chance of rain on Thursday."
+- User: "What's the weather like in New York?"
+- Nova: "The current weather in New York is 75°F with partly cloudy skies. The humidity is 60% with light winds from the southwest. For the next few days, expect highs in the mid-70s with a chance of rain on Thursday."
 
 **Response includes**:
 
--   **Current conditions**: Temperature, humidity, wind, visibility, UV index
--   **5-day forecast**: Daily high/low temperatures and conditions for each day
+- **Current conditions**: Temperature, humidity, wind, visibility, UV index
+- **5-day forecast**: Daily high/low temperatures and conditions for each day
 
 **Supported location formats**:
 
--   City names: "New York", "London", "Tokyo"
--   City with state/country: "Atlanta, Georgia", "Paris, France"
--   Postal codes: "10001", "SW1A 1AA"
--   Coordinates: "40.7128,-74.0060"
+- City names: "New York", "London", "Tokyo"
+- City with state/country: "Atlanta, Georgia", "Paris, France"
+- Postal codes: "10001", "SW1A 1AA"
+- Coordinates: "40.7128,-74.0060"
 
 ### 3. Web Search Tool
 
@@ -188,32 +188,32 @@ Search the web for current information, news, facts, or answers to questions
 
 **Parameters**:
 
--   `query` (required): Search query to find information on the web
--   `count` (optional): Number of search results to return (default: 5, maximum: 20)
+- `query` (required): Search query to find information on the web
+- `count` (optional): Number of search results to return (default: 5, maximum: 20)
 
 **Requirements**:
 
--   `BRAVE_API_KEY` environment variable must be set
--   Uses Brave Search API service
+- `BRAVE_API_KEY` environment variable must be set
+- Uses Brave Search API service
 
 **Example conversation**:
 
--   User: "What's the latest news about AI?"
--   Nova: "Based on my web search, here are the latest AI developments: Recent breakthroughs in large language models have shown significant improvements in reasoning capabilities, with several companies announcing new AI models this week. There's also growing discussion about AI safety regulations and their potential impact on the industry."
+- User: "What's the latest news about AI?"
+- Nova: "Based on my web search, here are the latest AI developments: Recent breakthroughs in large language models have shown significant improvements in reasoning capabilities, with several companies announcing new AI models this week. There's also growing discussion about AI safety regulations and their potential impact on the industry."
 
 **Response includes**:
 
--   **Search results**: Title, URL, description, and publication date for each result
--   **Query information**: Original query, any spelling corrections, and search metadata
--   **Result count**: Total number of results found and returned
+- **Search results**: Title, URL, description, and publication date for each result
+- **Query information**: Original query, any spelling corrections, and search metadata
+- **Result count**: Total number of results found and returned
 
 **Supported query types**:
 
--   Current events: "latest news about climate change"
--   Factual information: "population of Tokyo 2024"
--   Product information: "iPhone 15 price and specs"
--   How-to queries: "how to bake chocolate chip cookies"
--   Definitions: "what is quantum computing"
+- Current events: "latest news about climate change"
+- Factual information: "population of Tokyo 2024"
+- Product information: "iPhone 15 price and specs"
+- How-to queries: "how to bake chocolate chip cookies"
+- Definitions: "what is quantum computing"
 
 ### 4. Frame Analysis Tool
 
@@ -229,148 +229,141 @@ Analyze video frames from the live stream using AI
 
 **Requirements**:
 
--   Frame analysis must be enabled (default)
--   AWS credentials with `bedrock:InvokeModel` permissions
+- Frame analysis must be enabled (default)
+- AWS credentials with `bedrock:InvokeModel` permissions
 
 **Example conversation**:
 
--   User: "What do you see?"
--   Nova: "I can see you sitting at a desk in what appears to be a home office. You're wearing a blue shirt and there's a bookshelf visible in the background with several books and a small plant. The lighting appears to be natural daylight coming from a window to your left."
+- User: "What do you see?"
+- Nova: "I can see you sitting at a desk in what appears to be a home office. You're wearing a blue shirt and there's a bookshelf visible in the background with several books and a small plant. The lighting appears to be natural daylight coming from a window to your left."
 
 **Features**:
 
--   **Non-blocking processing**: Frame analysis runs asynchronously without affecting audio/video streams
--   **Smart frame capture**: Captures the current frame when the tool is requested for consistency
--   **Comprehensive analysis**: Describes people, objects, activities, text, and environmental details
--   **Error handling**: Graceful fallback if frame analysis fails
+- **Non-blocking processing**: Frame analysis runs asynchronously without affecting audio/video streams
+- **Smart frame capture**: Captures the current frame when the tool is requested for consistency
+- **Comprehensive analysis**: Describes people, objects, activities, text, and environmental details
+- **Error handling**: Graceful fallback if frame analysis fails
 
 **Use Cases**:
 
--   Visual assistance for accessibility
--   Content description and moderation
--   Interactive visual conversations
--   Environmental awareness for AI assistant
+- Visual assistance for accessibility
+- Content description and moderation
+- Interactive visual conversations
+- Environmental awareness for AI assistant
 
 ## API Setup
 
 ### Weather API Setup
 
 1. **Get API Key**:
-
-    - Visit [WeatherAPI.com](https://www.weatherapi.com/)
-    - Sign up for a free account
-    - Get your API key from the dashboard
+   - Visit [WeatherAPI.com](https://www.weatherapi.com/)
+   - Sign up for a free account
+   - Get your API key from the dashboard
 
 2. **Set Environment Variable**:
 
-    ```bash
-    export WEATHER_API_KEY=your_api_key_here
-    ```
+   ```bash
+   export WEATHER_API_KEY=your_api_key_here
+   ```
 
 3. **Verify Setup**:
-    - When you run the script, you should see: "🌤️ Weather tool is available"
-    - If not configured: "⚠️ `weather_api_key` not found. Weather tool will not be available."
+   - When you run the script, you should see: "🌤️ Weather tool is available"
+   - If not configured: "⚠️ `weather_api_key` not found. Weather tool will not be available."
 
 ### Web Search API Setup
 
 1. **Get API Key**:
-
-    - Visit [Brave Search API](https://api.search.brave.com/)
-    - Sign up for a free account
-    - Get your API key from the dashboard
+   - Visit [Brave Search API](https://api.search.brave.com/)
+   - Sign up for a free account
+   - Get your API key from the dashboard
 
 2. **Set Environment Variable**:
 
-    ```bash
-    export BRAVE_API_KEY=your_api_key_here
-    ```
+   ```bash
+   export BRAVE_API_KEY=your_api_key_here
+   ```
 
 3. **Verify Setup**:
-    - When you run the script, you should see: "🔍 Web search tool is available"
-    - If not configured: "⚠️ `brave_api_key` not found. Web search tool will not be available."
+   - When you run the script, you should see: "🔍 Web search tool is available"
+   - If not configured: "⚠️ `brave_api_key` not found. Web search tool will not be available."
 
 ## Technical Details
 
 ### Audio Processing
 
--   **Input Format**: 48kHz stereo from IVS participants
--   **Nova Input**: 16kHz mono for speech recognition
--   **Nova Output**: 24kHz mono for speech synthesis
--   **Output Format**: 48kHz stereo for IVS publishing
+- **Input Format**: 48kHz stereo from IVS participants
+- **Nova Input**: 16kHz mono for speech recognition
+- **Nova Output**: 24kHz mono for speech synthesis
+- **Output Format**: 48kHz stereo for IVS publishing
 
 ### SEI Publishing
 
--   **Metadata Embedding**: AI assistant responses are embedded directly into H.264 video streams
--   **Perfect Synchronization**: Metadata travels with video frames ensuring synchronized delivery
--   **Standards Compliant**: Uses H.264 SEI (Supplemental Enhancement Information) NAL units
--   **Automatic Integration**: Seamlessly integrates with aiortc and PyAV H.264 encoders
--   **Reliable Delivery**: 3x repetition with client-side deduplication based on timestamps
+- **Metadata Embedding**: AI assistant responses are embedded directly into H.264 video streams
+- **Perfect Synchronization**: Metadata travels with video frames ensuring synchronized delivery
+- **Standards Compliant**: Uses H.264 SEI (Supplemental Enhancement Information) NAL units
+- **Automatic Integration**: Seamlessly integrates with aiortc and PyAV H.264 encoders
+- **Reliable Delivery**: 3x repetition with client-side deduplication based on timestamps
 
 ### Frame Analysis
 
--   **Processing**: Asynchronous, non-blocking frame analysis
--   **Models**: Supports various Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
--   **Frame Capture**: Captures frame at request time for consistency
--   **Timeout Protection**: 30-second timeout with 10 seconds for frame conversion
--   **Error Handling**: Comprehensive error handling with detailed logging
+- **Processing**: Asynchronous, non-blocking frame analysis
+- **Models**: Supports various Claude models (Sonnet 4, Claude 3.5 Sonnet, Claude 3.5 Haiku)
+- **Frame Capture**: Captures frame at request time for consistency
+- **Timeout Protection**: 30-second timeout with 10 seconds for frame conversion
+- **Error Handling**: Comprehensive error handling with detailed logging
 
 ### Waveform Visualization
 
--   Real-time audio visualization using matplotlib
--   Gradient colormap with dynamic amplitude scaling
--   Updates at 30 FPS for smooth animation
--   **Visual States**:
-    -   **Speaking**: Blue circle that throbs with audio amplitude
-    -   **Thinking**: Orange pulsing rings when Nova is processing requests
-    -   **Idle**: Static blue circle when not active
+- Real-time audio visualization using matplotlib
+- Gradient colormap with dynamic amplitude scaling
+- Updates at 30 FPS for smooth animation
+- **Visual States**:
+  - **Speaking**: Blue circle that throbs with audio amplitude
+  - **Thinking**: Orange pulsing rings when Nova is processing requests
+  - **Idle**: Static blue circle when not active
 
 ### WebRTC Configuration
 
--   Proper SDP munging for IVS compatibility
--   Bidirectional peer connections (publish + subscribe)
--   Audio track management with proper timing
--   Error handling and reconnection logic
+- Proper SDP munging for IVS compatibility
+- Bidirectional peer connections (publish + subscribe)
+- Audio track management with proper timing
+- Error handling and reconnection logic
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **No Audio Output**:
-
-    - Check AWS credentials and Bedrock permissions
-    - Verify participant token has both PUBLISH and SUBSCRIBE capabilities
-    - Ensure audio input device is working
+   - Check AWS credentials and Bedrock permissions
+   - Verify participant token has both PUBLISH and SUBSCRIBE capabilities
+   - Ensure audio input device is working
 
 2. **Weather Tool Not Working**:
-
-    - Verify `WEATHER_API_KEY` environment variable is set
-    - Check API key validity at WeatherAPI.com
-    - Ensure internet connectivity for API requests
+   - Verify `WEATHER_API_KEY` environment variable is set
+   - Check API key validity at WeatherAPI.com
+   - Ensure internet connectivity for API requests
 
 3. **Web Search Tool Not Working**:
-
-    - Verify `BRAVE_API_KEY` environment variable is set
-    - Check API key validity at Brave Search API dashboard
-    - Ensure internet connectivity for API requests
-    - Check API rate limits and usage quotas
+   - Verify `BRAVE_API_KEY` environment variable is set
+   - Check API key validity at Brave Search API dashboard
+   - Ensure internet connectivity for API requests
+   - Check API rate limits and usage quotas
 
 4. **Frame Analysis Issues**:
-
-    - Verify AWS credentials have `bedrock:InvokeModel` permissions
-    - Check Claude model availability in your region
-    - Ensure video track is receiving frames
-    - Monitor Bedrock usage and costs
+   - Verify AWS credentials have `bedrock:InvokeModel` permissions
+   - Check Claude model availability in your region
+   - Ensure video track is receiving frames
+   - Monitor Bedrock usage and costs
 
 5. **Poor Audio Quality**:
-
-    - Check network bandwidth and stability
-    - Verify audio input device quality
-    - Monitor CPU usage during processing
+   - Check network bandwidth and stability
+   - Verify audio input device quality
+   - Monitor CPU usage during processing
 
 6. **WebRTC Connection Issues**:
-    - Check firewall settings for WebRTC traffic
-    - Verify IVS stage ARN and token validity
-    - Monitor network connectivity
+   - Check firewall settings for WebRTC traffic
+   - Verify IVS stage ARN and token validity
+   - Monitor network connectivity
 
 ### Debug Mode
 
@@ -385,117 +378,114 @@ python ivs-stage-nova-s2s.py --token "your-token" --subscribe-to "ABC123"
 ### Performance Optimization
 
 1. **Connection Speed**:
-
-    - Use `--ice-timeout 1` for faster connection establishment (default)
-    - Original WebRTC ICE timeout is 5 seconds, reduced to 1 second for better UX
-    - Increase timeout if experiencing connection issues in poor network conditions
+   - Use `--ice-timeout 1` for faster connection establishment (default)
+   - Original WebRTC ICE timeout is 5 seconds, reduced to 1 second for better UX
+   - Increase timeout if experiencing connection issues in poor network conditions
 
 2. **Audio Processing**:
-
-    - Use consistent 1ms delays between audio chunks
-    - Implement proper buffering strategies
-    - Monitor memory usage during long sessions
+   - Use consistent 1ms delays between audio chunks
+   - Implement proper buffering strategies
+   - Monitor memory usage during long sessions
 
 3. **Frame Analysis**:
-
-    - Choose appropriate Claude model for your use case
-    - Monitor Bedrock usage and costs
-    - Consider disabling for performance-critical applications
+   - Choose appropriate Claude model for your use case
+   - Monitor Bedrock usage and costs
+   - Consider disabling for performance-critical applications
 
 4. **Visualization**:
-    - Reduce frame rate if CPU usage is high
-    - Disable visualization for headless operation
-    - Use smaller video resolution if needed
+   - Reduce frame rate if CPU usage is high
+   - Disable visualization for headless operation
+   - Use smaller video resolution if needed
 
 ## Model Options
 
 ### Nova Models
 
--   **amazon.nova-sonic-v1:0** (default): Latest Nova Sonic model for speech-to-speech
+- **amazon.nova-sonic-v1:0** (default): Latest Nova Sonic model for speech-to-speech
 
 ### Claude Models for Frame Analysis
 
--   **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-20250514-v1:0` - Most capable, best for complex analysis
--   **Claude 3.5 Sonnet**: `anthropic.claude-3-5-sonnet-20241022-v2:0` - Very capable, good balance of performance and cost
--   **Claude 3.5 Haiku**: `anthropic.claude-3-5-haiku-20241022-v1:0` - Fastest and cheapest, good for basic analysis
+- **Claude Sonnet 4** (default): `us.anthropic.claude-sonnet-4-6` - Most capable, best for complex analysis
+- **Claude 3.5 Sonnet**: `anthropic.claude-3-5-sonnet-20241022-v2:0` - Very capable, good balance of performance and cost
+- **Claude 3.5 Haiku**: `anthropic.claude-3-5-haiku-20241022-v1:0` - Fastest and cheapest, good for basic analysis
 
 ## API Limits
 
 ### WeatherAPI.com Free Tier
 
--   1,000,000 calls per month
--   1 call per second rate limit
--   Current weather data only
+- 1,000,000 calls per month
+- 1 call per second rate limit
+- Current weather data only
 
 ### Brave Search API Free Tier
 
--   2,000 queries per month
--   Rate limits apply per API key
--   Web search results only
+- 2,000 queries per month
+- Rate limits apply per API key
+- Web search results only
 
 ### Amazon Nova Sonic
 
--   Regional availability varies
--   Pricing based on audio processing time
--   Rate limits apply per account
+- Regional availability varies
+- Pricing based on audio processing time
+- Rate limits apply per account
 
 ### Amazon Bedrock Claude
 
--   Model-specific pricing and rate limits
--   Regional availability varies
--   Monitor usage in AWS console
+- Model-specific pricing and rate limits
+- Regional availability varies
+- Monitor usage in AWS console
 
 ## Security Notes
 
--   Never commit API keys to version control
--   Use environment variables for sensitive data
--   Rotate API keys regularly
--   Monitor API usage and costs
+- Never commit API keys to version control
+- Use environment variables for sensitive data
+- Rotate API keys regularly
+- Monitor API usage and costs
 
 ## Examples
 
 ### Weather Queries
 
--   "What's the weather in London?"
--   "How's the weather in 90210?"
--   "Tell me about the weather in Tokyo, Japan"
--   "What's the forecast for this week in Seattle?"
--   "Will it rain tomorrow in Miami?"
--   "What are the high and low temperatures for the next few days?"
+- "What's the weather in London?"
+- "How's the weather in 90210?"
+- "Tell me about the weather in Tokyo, Japan"
+- "What's the forecast for this week in Seattle?"
+- "Will it rain tomorrow in Miami?"
+- "What are the high and low temperatures for the next few days?"
 
 ### Date/Time Queries
 
--   "What time is it in New York?"
--   "What's today's date in London?"
--   "What day of the week is it in Tokyo?"
--   "What time is it in Los Angeles right now?"
+- "What time is it in New York?"
+- "What's today's date in London?"
+- "What day of the week is it in Tokyo?"
+- "What time is it in Los Angeles right now?"
 
 ### Visual Queries (Frame Analysis)
 
--   "What do you see?"
--   "Can you see me?"
--   "What's in my background?"
--   "Describe what I'm wearing"
--   "What objects are visible in the room?"
--   "Can you read any text in the image?"
+- "What do you see?"
+- "Can you see me?"
+- "What's in my background?"
+- "Describe what I'm wearing"
+- "What objects are visible in the room?"
+- "Can you read any text in the image?"
 
 ### Web Search Queries
 
--   "What's the latest news about AI?"
--   "Search for information about climate change"
--   "What's the current price of Bitcoin?"
--   "Find recent articles about space exploration"
--   "Search for the best restaurants in Paris"
--   "What are the latest developments in renewable energy?"
+- "What's the latest news about AI?"
+- "Search for information about climate change"
+- "What's the current price of Bitcoin?"
+- "Find recent articles about space exploration"
+- "Search for the best restaurants in Paris"
+- "What are the latest developments in renewable energy?"
 
 ### Combined Queries
 
--   "What's the weather and time in New York?"
--   "Is it a good day for outdoor activities in San Francisco?"
--   "What's the forecast for the weekend in Chicago?"
--   "Should I bring an umbrella tomorrow in London?"
--   "What do you see and what's the weather like outside?"
--   "Search for current events and tell me the time in London"
+- "What's the weather and time in New York?"
+- "Is it a good day for outdoor activities in San Francisco?"
+- "What's the forecast for the weekend in Chicago?"
+- "Should I bring an umbrella tomorrow in London?"
+- "What do you see and what's the weather like outside?"
+- "Search for current events and tell me the time in London"
 
 ## SEI Publishing System
 
@@ -503,10 +493,10 @@ This script uses the SEI (Supplemental Enhancement Information) publishing syste
 
 **Key Benefits:**
 
--   AI responses are embedded in video frames for synchronized delivery
--   No separate data channels needed for metadata transmission
--   Standards-compliant H.264 implementation
--   Automatic integration with existing video pipelines
+- AI responses are embedded in video frames for synchronized delivery
+- No separate data channels needed for metadata transmission
+- Standards-compliant H.264 implementation
+- Automatic integration with existing video pipelines
 
 **For detailed SEI documentation, see [`../stages_sei/SEI.md`](../stages_sei/SEI.md).**
 
