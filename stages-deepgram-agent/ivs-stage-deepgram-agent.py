@@ -241,9 +241,11 @@ async def subscribe_to_participant(token: str, participant_id: str, agent_manage
             traceback.print_exc()
 
     async def _consume_video(track: MediaStreamTrack):
+        """Consume video frames and store the latest for frame analysis"""
         try:
             while True:
-                await track.recv()
+                frame = await track.recv()
+                agent_manager.frame = frame
         except Exception:
             pass
 
@@ -316,6 +318,13 @@ Environment variables:
     )
     parser.add_argument("--language", default="en", help="Language code (default: en)")
     parser.add_argument("--ice-timeout", type=int, default=1, help="ICE gathering timeout in seconds (default: 1)")
+    parser.add_argument("--disable-frame-analysis", action="store_true", help="Disable video frame analysis (default: enabled)")
+    parser.add_argument(
+        "--bedrock-model-id",
+        default="us.anthropic.claude-sonnet-4-6",
+        help="Bedrock model ID for frame analysis (default: Claude Sonnet 4)",
+    )
+    parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock (default: us-east-1)")
     return parser.parse_args()
 
 
@@ -338,6 +347,12 @@ async def main():
     logger.info(f"🗣️  Voice: {args.voice}")
     logger.info(f"🧠 Think: {args.think_provider}/{args.think_model}")
     logger.info(f"🌍 Language: {args.language}")
+
+    enable_frame_analysis = not args.disable_frame_analysis
+    logger.info(f"🔍 Frame analysis: {'enabled' if enable_frame_analysis else 'disabled'}")
+    if enable_frame_analysis:
+        logger.info(f"🧠 Analysis model: {args.bedrock_model_id}")
+        logger.info(f"🌍 Analysis region: {args.bedrock_region}")
 
     token_payload = parse_jwt(args.token)
     if not token_payload:
@@ -373,6 +388,9 @@ async def main():
             greeting=args.greeting,
             language=args.language,
             output_sample_rate=OUTPUT_SAMPLE_RATE,
+            enable_frame_analysis=enable_frame_analysis,
+            bedrock_model_id=args.bedrock_model_id,
+            bedrock_region=args.bedrock_region,
         )
         await agent_manager.initialize()
 

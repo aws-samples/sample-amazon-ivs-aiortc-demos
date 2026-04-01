@@ -44,6 +44,7 @@ Supporting module:
 - **Configurable LLM provider** — OpenAI, Anthropic, or Groq
 - **50+ TTS voices** via Deepgram Aura 2 (English and Spanish)
 - **Custom system prompts and greetings** — define the agent's personality
+- **Video frame analysis** — vision via Bedrock Claude tool calling (ask "what do you see?")
 - **Automatic barge-in / interruption handling** — agent stops speaking when the user talks
 - **Real-time audio visualization** — throbbing circle with thinking state animation
 - **SEI transcript publishing** — user and agent transcripts embedded in the H.264 video stream
@@ -57,8 +58,9 @@ Supporting module:
 | STT                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Nova-3                        |
 | LLM                   | Nova Sonic (built-in) | GPT-4o (built-in) | Configurable (OpenAI, Anthropic, Groq) |
 | TTS                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Aura 2 (50+ voices)           |
+| Vision                | Bedrock Claude (tool) | OpenAI native     | Bedrock Claude (tool)                  |
 | WebSocket Connections | 1 (Bedrock)           | 1 (OpenAI)        | 1 (Deepgram)                           |
-| AWS Dependency        | Yes (Bedrock)         | No                | No                                     |
+| AWS Dependency        | Yes (Bedrock)         | No                | Optional (Bedrock for vision only)     |
 | LLM Flexibility       | Fixed                 | Fixed             | Swappable at launch                    |
 | SEI Transcripts       | Yes                   | Yes               | Yes                                    |
 | Visual Feedback       | Yes                   | Yes               | Yes                                    |
@@ -133,7 +135,7 @@ python ivs-stage-deepgram-agent.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --subscribe-to "participant123" \
   --think-provider "anthropic" \
-  --think-model "claude-sonnet-4-20250514"
+  --think-model "claude-sonnet-4-6"
 ```
 
 ### With Groq (Ultra-Low Latency)
@@ -148,18 +150,67 @@ python ivs-stage-deepgram-agent.py \
 
 ## Command-Line Arguments
 
-| Argument             | Required | Default                            | Description                                                   |
-| -------------------- | -------- | ---------------------------------- | ------------------------------------------------------------- |
-| `--token`            | Yes      | —                                  | IVS participant token with PUBLISH and SUBSCRIBE capabilities |
-| `--subscribe-to`     | Yes      | —                                  | Participant ID to subscribe to                                |
-| `--deepgram-api-key` | No       | `DEEPGRAM_API_KEY` env var         | Deepgram API key                                              |
-| `--voice`            | No       | `aura-2-asteria-en`                | Deepgram TTS voice model                                      |
-| `--think-model`      | No       | `gpt-4o-mini`                      | LLM model for agent reasoning                                 |
-| `--think-provider`   | No       | `open_ai`                          | LLM provider: `open_ai`, `anthropic`, `groq`                  |
-| `--prompt`           | No       | _(friendly assistant)_             | System prompt for the agent personality                       |
-| `--greeting`         | No       | `Hello! How can I help you today?` | Greeting spoken when the session starts                       |
-| `--language`         | No       | `en`                               | Language code                                                 |
-| `--ice-timeout`      | No       | `1`                                | ICE gathering timeout in seconds                              |
+| Argument                   | Required | Default                            | Description                                                   |
+| -------------------------- | -------- | ---------------------------------- | ------------------------------------------------------------- |
+| `--token`                  | Yes      | —                                  | IVS participant token with PUBLISH and SUBSCRIBE capabilities |
+| `--subscribe-to`           | Yes      | —                                  | Participant ID to subscribe to                                |
+| `--deepgram-api-key`       | No       | `DEEPGRAM_API_KEY` env var         | Deepgram API key                                              |
+| `--voice`                  | No       | `aura-2-asteria-en`                | Deepgram TTS voice model                                      |
+| `--think-model`            | No       | `gpt-4o-mini`                      | LLM model for agent reasoning                                 |
+| `--think-provider`         | No       | `open_ai`                          | LLM provider: `open_ai`, `anthropic`, `groq`                  |
+| `--prompt`                 | No       | _(friendly assistant)_             | System prompt for the agent personality                       |
+| `--greeting`               | No       | `Hello! How can I help you today?` | Greeting spoken when the session starts                       |
+| `--language`               | No       | `en`                               | Language code                                                 |
+| `--ice-timeout`            | No       | `1`                                | ICE gathering timeout in seconds                              |
+| `--disable-frame-analysis` | No       | _(enabled)_                        | Disable video frame analysis via Bedrock Claude               |
+| `--bedrock-model-id`       | No       | `us.anthropic.claude-sonnet-4-6`   | Bedrock model for frame analysis                              |
+| `--bedrock-region`         | No       | `us-east-1`                        | AWS region for Bedrock                                        |
+
+## Vision (Frame Analysis)
+
+Deepgram's Voice Agent API doesn't have native vision, but this demo adds it using Deepgram's client-side function calling and Amazon Bedrock Claude. When the user asks the agent to "look at something" or "describe what you see", the agent calls the `analyze_frame` tool, which:
+
+1. Captures the latest video frame from the participant's WebRTC stream
+2. Converts it to JPEG and base64-encodes it
+3. Sends it to Bedrock Claude for analysis
+4. Returns the description to the Deepgram agent, which speaks it naturally
+
+This is the same approach used by the Nova S2S demo — the agent doesn't "see" natively, but the tool gives it vision on demand.
+
+### Usage with Vision
+
+```bash
+# Default: vision enabled with Claude Sonnet 4
+python ivs-stage-deepgram-agent.py \
+  --token "eyJ..." \
+  --subscribe-to "participant123"
+
+# With a different Claude model
+python ivs-stage-deepgram-agent.py \
+  --token "eyJ..." \
+  --subscribe-to "participant123" \
+  --bedrock-model-id "anthropic.claude-3-5-haiku-20241022-v1:0"
+
+# Disable vision entirely (no AWS dependency)
+python ivs-stage-deepgram-agent.py \
+  --token "eyJ..." \
+  --subscribe-to "participant123" \
+  --disable-frame-analysis
+```
+
+### How It Works Under the Hood
+
+The `analyze_frame` function is registered as a `client_side: true` tool in the Deepgram agent settings. When the LLM decides to call it:
+
+1. Deepgram sends a `FunctionCallRequest` with `client_side: true`
+2. The `DeepgramAgentManager` intercepts it and calls `_handle_analyze_frame`
+3. The current video frame is converted to base64 JPEG and sent to Bedrock Claude
+4. The Claude response is sent back as a `FunctionCallResponse`
+5. Deepgram feeds the result to the LLM, which formulates a spoken response
+
+### Required AWS Permissions for Vision
+
+- `bedrock:InvokeModel` — for Claude frame analysis
 
 ## Available Voices
 

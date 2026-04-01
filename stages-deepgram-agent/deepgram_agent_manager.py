@@ -7,14 +7,19 @@ Receives user audio, sends it to Deepgram, and streams back agent audio response
 """
 
 import asyncio
+import base64
+import io
 import json
 import logging
 import time
 from typing import Optional, Callable, Any
 
+import boto3
+from PIL import Image
 from deepgram import AsyncDeepgramClient
 from deepgram.core.events import EventType
 from deepgram.agent.v1.types.agent_v1settings import AgentV1Settings
+from deepgram.agent.v1.types.agent_v1send_function_call_response import AgentV1SendFunctionCallResponse
 
 # SEI publishing for embedding transcripts in H.264 video stream
 try:
@@ -48,6 +53,9 @@ class DeepgramAgentManager:
         greeting: str = "Hello! How can I help you today?",
         language: str = "en",
         output_sample_rate: int = OUTPUT_SAMPLE_RATE,
+        enable_frame_analysis: bool = True,
+        bedrock_model_id: str = "us.anthropic.claude-sonnet-4-6",
+        bedrock_region: str = "us-east-1",
     ):
         self.api_key = api_key
         self.agent_audio_track = agent_audio_track
@@ -59,6 +67,20 @@ class DeepgramAgentManager:
         self.greeting = greeting
         self.language = language
         self.output_sample_rate = output_sample_rate
+
+        # Frame analysis (vision via Bedrock Claude)
+        self.enable_frame_analysis = enable_frame_analysis
+        self.bedrock_model_id = bedrock_model_id
+        self.bedrock_region = bedrock_region
+        self.frame = None  # Current video frame, set externally
+        self._bedrock_client = None
+        if enable_frame_analysis:
+            try:
+                self._bedrock_client = boto3.client("bedrock-runtime", region_name=bedrock_region)
+                logger.info(f"🔍 Frame analysis enabled (model: {bedrock_model_id}, region: {bedrock_region})")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not initialize Bedrock client: {e}")
+                self.enable_frame_analysis = False
 
         self._client: Optional[AsyncDeepgramClient] = None
         self._connection = None
@@ -99,6 +121,39 @@ class DeepgramAgentManager:
         # Small delay to let the WebSocket connect
         await asyncio.sleep(0.5)
 
+        # Build the think config
+        think_config = {
+            "provider": {
+                "type": self.think_provider,
+                "model": self.think_model,
+            },
+            "prompt": self._build_prompt(),
+        }
+
+        # Add frame analysis function if enabled
+        if self.enable_frame_analysis:
+            think_config["functions"] = [
+                {
+                    "name": "analyze_frame",
+                    "description": (
+                        "Analyze the current video frame from the user's camera. "
+                        "Use this when the user asks you to look at something, describe what you see, "
+                        "comment on their appearance or environment, or any question that requires "
+                        "visual information. Examples: 'what do you see?', 'look at this', "
+                        "'what am I wearing?', 'describe my room', 'can you see me?'"
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "string",
+                                "description": "Optional specific question about what the user wants analyzed in the frame",
+                            }
+                        },
+                    },
+                }
+            ]
+
         # Send settings
         settings = AgentV1Settings(
             type="Settings",
@@ -121,13 +176,7 @@ class DeepgramAgentManager:
                         "model": "nova-3",
                     }
                 },
-                "think": {
-                    "provider": {
-                        "type": self.think_provider,
-                        "model": self.think_model,
-                    },
-                    "prompt": self.prompt,
-                },
+                "think": think_config,
                 "speak": {
                     "provider": {
                         "type": "deepgram",
@@ -252,8 +301,21 @@ class DeepgramAgentManager:
             elif msg_type == "FunctionCallRequest":
                 functions = getattr(message, "functions", [])
                 for func in functions:
-                    name = getattr(func, "name", "unknown")
-                    logger.info(f"🔧 Function call requested: {name}")
+                    # The SDK may return functions as dicts or objects — handle both
+                    if isinstance(func, dict):
+                        name = func.get("name", "unknown")
+                        func_id = func.get("id", "")
+                        arguments = func.get("arguments", "{}")
+                    else:
+                        name = getattr(func, "name", "unknown")
+                        func_id = getattr(func, "id", "")
+                        arguments = getattr(func, "arguments", "{}")
+                    logger.info(f"🔧 Function call requested: {name} (id={func_id})")
+
+                    if name == "analyze_frame":
+                        asyncio.ensure_future(self._handle_analyze_frame(func_id, arguments))
+                    else:
+                        logger.warning(f"⚠️  Unknown function: {name} — raw: {func}")
 
             elif msg_type == "Error":
                 code = getattr(message, "code", "UNKNOWN")
@@ -287,6 +349,147 @@ class DeepgramAgentManager:
             logger.info(f"📡 Published SEI: {role} - " f"'{transcript[:30]}{'...' if len(transcript) > 30 else ''}'")
         except Exception as e:
             logger.error(f"❌ Error publishing transcript SEI: {e}")
+
+    def _build_prompt(self) -> str:
+        """Build the system prompt, adding vision instructions if frame analysis is enabled"""
+        base = self.prompt
+        if self.enable_frame_analysis:
+            base += (
+                "\n\nYou have access to a tool called 'analyze_frame' that lets you see "
+                "the user's video feed. If the user asks you to look at something, describe "
+                "what you see, comment on their appearance or surroundings, or asks any "
+                "question requiring visual information, use this tool. You cannot see by "
+                "default — you MUST call the tool to get visual information. When you receive "
+                "the analysis result, respond conversationally as if you can see them directly. "
+                "Refer to the user as 'you' (not 'the person' or 'they')."
+            )
+        return base
+
+    async def _handle_analyze_frame(self, func_id: str, arguments_str: str) -> None:
+        """Handle the analyze_frame function call by sending the frame to Bedrock Claude"""
+        try:
+            from deepgram.agent.v1.types.agent_v1inject_agent_message import AgentV1InjectAgentMessage
+
+            # Inject a filler message so the user knows we're working on it
+            try:
+                import random
+
+                fillers = [
+                    "Let me take a look...",
+                    "One moment, let me see...",
+                    "Sure, looking now...",
+                    "Okay, let me check that out...",
+                    "Hang on, taking a look...",
+                    "Let me see what I can see...",
+                ]
+                filler = AgentV1InjectAgentMessage(
+                    type="InjectAgentMessage",
+                    message=random.choice(fillers),
+                )
+                await self._connection.send_inject_agent_message(filler)
+            except Exception:
+                pass  # Non-critical — don't let filler failure block analysis
+
+            args = json.loads(arguments_str) if arguments_str else {}
+            user_prompt = args.get("prompt", "")
+
+            if self.frame is None:
+                result = "No video frame is currently available. The user may not have their camera on."
+                logger.warning("🔍 analyze_frame called but no frame available")
+            elif not self._bedrock_client:
+                result = "Frame analysis is not available — Bedrock client not initialized."
+                logger.warning("🔍 analyze_frame called but Bedrock client not available")
+            else:
+                logger.info("🔍 Analyzing video frame with Bedrock Claude...")
+                if self.agent_video_track:
+                    self.agent_video_track.set_thinking_state(True)
+
+                result = await self._call_bedrock_vision(self.frame, user_prompt)
+
+                if self.agent_video_track:
+                    self.agent_video_track.set_thinking_state(False)
+
+            # Send the function call response back to Deepgram
+            response = AgentV1SendFunctionCallResponse(
+                type="FunctionCallResponse",
+                id=func_id,
+                name="analyze_frame",
+                content=result if isinstance(result, str) else json.dumps(result),
+            )
+            await self._connection.send_function_call_response(response)
+            logger.info(f"📸 Frame analysis sent back to agent ({len(result)} chars)")
+
+        except Exception as e:
+            logger.error(f"❌ Error handling analyze_frame: {e}")
+            import traceback
+
+            traceback.print_exc()
+            # Send error response so the agent doesn't hang
+            try:
+                response = AgentV1SendFunctionCallResponse(
+                    type="FunctionCallResponse",
+                    id=func_id,
+                    name="analyze_frame",
+                    content=f"Error analyzing frame: {str(e)}",
+                )
+                await self._connection.send_function_call_response(response)
+            except Exception:
+                pass
+
+    async def _call_bedrock_vision(self, frame, user_prompt: str = "") -> str:
+        """Call Bedrock Claude to analyze a video frame"""
+        loop = asyncio.get_event_loop()
+
+        # Convert frame to base64 JPEG
+        def _frame_to_base64():
+            img = frame.to_image()
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=85)
+            buf.seek(0)
+            return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+        frame_b64 = await asyncio.wait_for(loop.run_in_executor(None, _frame_to_base64), timeout=10)
+
+        if not frame_b64:
+            return "Failed to convert video frame to image."
+
+        bedrock_prompt = (
+            "Analyze this video frame from a live stream. Describe what you see in detail. "
+            "Refer to the subject as 'you' — respond as if speaking directly to them. "
+            "Be conversational and specific about people, objects, activities, and environment."
+        )
+        if user_prompt:
+            bedrock_prompt += f" The user specifically asked: '{user_prompt}'"
+
+        message = {
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": frame_b64}},
+                {"type": "text", "text": bedrock_prompt},
+            ],
+        }
+
+        def _bedrock_call():
+            return self._bedrock_client.invoke_model(
+                modelId=self.bedrock_model_id,
+                body=json.dumps(
+                    {
+                        "anthropic_version": "bedrock-2023-05-31",
+                        "max_tokens": 150,
+                        "messages": [message],
+                        "temperature": 0.4,
+                    }
+                ),
+            )
+
+        response = await asyncio.wait_for(loop.run_in_executor(None, _bedrock_call), timeout=20)
+
+        body = json.loads(response["body"].read())
+        result = body["content"][0]["text"]
+        logger.info(f"📸 Frame analysis: {result[:100]}...")
+        return result
 
     async def _clear_agent_audio(self) -> None:
         """Clear the agent audio buffer on interruption"""
