@@ -30,6 +30,187 @@ INT16_MAX: float = 32768.0
 INT32_MAX: float = 2147483648.0
 
 
+class TextIntelligenceAnalyzer:
+    """Periodically analyzes accumulated transcripts using Deepgram's Read API"""
+
+    def __init__(
+        self,
+        api_key: str,
+        sentiment: bool = False,
+        topics: bool = False,
+        intents: bool = False,
+        summarize: bool = False,
+        language: str = "en",
+        interval: int = 30,
+    ) -> None:
+        self.api_key = api_key
+        self.sentiment = sentiment
+        self.topics = topics
+        self.intents = intents
+        self.summarize = summarize
+        self.language = language
+        self.interval = interval
+
+        self._transcript_buffer: List[str] = []
+        self._all_transcripts: List[str] = []  # Full history for summarization
+        self._task: Optional[asyncio.Task] = None
+        self._should_stop = False
+        self._analysis_count = 0
+
+        features = []
+        if sentiment:
+            features.append("sentiment")
+        if topics:
+            features.append("topics")
+        if intents:
+            features.append("intents")
+        if summarize:
+            features.append("summarize")
+        logger.info(f"🧠 Text Intelligence enabled: {', '.join(features)} (every {interval}s)")
+
+    def add_transcript(self, text: str) -> None:
+        """Add a final transcript to the buffer"""
+        if text.strip():
+            self._transcript_buffer.append(text.strip())
+            self._all_transcripts.append(text.strip())
+
+    def start(self) -> None:
+        """Start the periodic analysis background task"""
+        self._task = asyncio.create_task(self._analysis_loop())
+
+    def stop(self) -> None:
+        self._should_stop = True
+        if self._task and not self._task.done():
+            self._task.cancel()
+
+    async def _analysis_loop(self) -> None:
+        """Run analysis on accumulated transcripts at regular intervals"""
+        while not self._should_stop:
+            await asyncio.sleep(self.interval)
+            if self._should_stop:
+                break
+
+            # Grab and clear the buffer
+            if not self._transcript_buffer:
+                continue
+
+            batch = list(self._transcript_buffer)
+            self._transcript_buffer.clear()
+            text = " ".join(batch)
+
+            if len(text.split()) < 5:
+                continue  # Not enough text to analyze meaningfully
+
+            self._analysis_count += 1
+            await self._analyze(text)
+
+        # Final analysis on remaining buffer
+        if self._transcript_buffer:
+            text = " ".join(self._transcript_buffer)
+            if len(text.split()) >= 5:
+                await self._analyze(text)
+
+    async def _analyze(self, text: str) -> None:
+        """Send text to Deepgram Read API for analysis"""
+        try:
+            params: Dict[str, Any] = {"language": self.language}
+            if self.sentiment:
+                params["sentiment"] = "true"
+            if self.topics:
+                params["topics"] = "true"
+            if self.intents:
+                params["intents"] = "true"
+            if self.summarize:
+                # For summarization, use the full transcript history for better context
+                params["summarize"] = "v2"
+
+            headers = {
+                "Authorization": f"Token {self.api_key}",
+                "Content-Type": "application/json",
+            }
+
+            body = {"text": text}
+            # Use full history for summarization
+            if self.summarize:
+                body["text"] = " ".join(self._all_transcripts)
+
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    "https://api.deepgram.com/v1/read",
+                    params=params,
+                    headers=headers,
+                    json=body,
+                    timeout=15,
+                ),
+            )
+
+            if response.status_code != 200:
+                logger.warning(f"⚠️  Text Intelligence API returned {response.status_code}: {response.text[:200]}")
+                return
+
+            result = response.json().get("results", {})
+            self._print_results(result)
+
+        except Exception as e:
+            logger.error(f"❌ Text Intelligence analysis failed: {e}")
+
+    def _print_results(self, results: Dict[str, Any]) -> None:
+        """Print analysis results to console"""
+        print(f"\n{'─' * 60}")
+        print(f"📊 TEXT INTELLIGENCE (analysis #{self._analysis_count})")
+        print(f"{'─' * 60}")
+
+        # Sentiment
+        if self.sentiment:
+            sentiments = results.get("sentiments", {})
+            segments = sentiments.get("segments", [])
+            if segments:
+                # Calculate overall sentiment from segments
+                pos = sum(1 for s in segments if s.get("sentiment") == "positive")
+                neg = sum(1 for s in segments if s.get("sentiment") == "negative")
+                neu = sum(1 for s in segments if s.get("sentiment") == "neutral")
+                total = len(segments)
+                avg_score = sum(s.get("sentiment_score", 0) for s in segments) / total if total else 0
+                print(f"  💭 Sentiment: positive={pos} neutral={neu} negative={neg} (avg score: {avg_score:.2f})")
+
+                # Show the most recent sentiment segment
+                latest = segments[-1]
+                print(f"     Latest: \"{latest.get('text', '')[:60]}\" → {latest.get('sentiment')} ({latest.get('sentiment_score', 0):.2f})")
+
+        # Topics
+        if self.topics:
+            topics_data = results.get("topics", {})
+            segments = topics_data.get("segments", [])
+            all_topics = set()
+            for seg in segments:
+                for topic in seg.get("topics", []):
+                    all_topics.add(topic.get("topic", ""))
+            if all_topics:
+                print(f"  🏷️  Topics: {', '.join(sorted(all_topics))}")
+
+        # Intents
+        if self.intents:
+            intents_data = results.get("intents", {})
+            segments = intents_data.get("segments", [])
+            all_intents = set()
+            for seg in segments:
+                for intent in seg.get("intents", []):
+                    all_intents.add(intent.get("intent", ""))
+            if all_intents:
+                print(f"  🎯 Intents: {', '.join(sorted(all_intents))}")
+
+        # Summary
+        if self.summarize:
+            summary = results.get("summary", {})
+            summary_text = summary.get("text", "")
+            if summary_text:
+                print(f"  📝 Summary: {summary_text}")
+
+        print(f"{'─' * 60}\n")
+
+
 class VTTWriter:
     """Handles writing transcriptions to VTT format files"""
 
@@ -89,6 +270,7 @@ class DeepgramTranscriber:
         utterance_end_ms: int = 1000,
         endpointing: int = 300,
         vtt_writer: Optional[VTTWriter] = None,
+        text_analyzer: Optional[TextIntelligenceAnalyzer] = None,
     ) -> None:
         self.track: MediaStreamTrack = track
         self.deepgram_api_key: str = deepgram_api_key
@@ -101,6 +283,7 @@ class DeepgramTranscriber:
         self.utterance_end_ms: int = utterance_end_ms
         self.endpointing: int = endpointing
         self.vtt_writer: Optional[VTTWriter] = vtt_writer
+        self.text_analyzer: Optional[TextIntelligenceAnalyzer] = text_analyzer
 
         self._should_stop: bool = False
         self._resampler: av.AudioResampler = av.AudioResampler(format="s16", layout="mono", rate=SAMPLE_RATE)
@@ -288,6 +471,10 @@ class DeepgramTranscriber:
                 # Write to VTT if enabled
                 if self.vtt_writer and start_time and end_time:
                     self.vtt_writer.write_transcription(f"{speaker}{transcript}", start_time, end_time)
+
+                # Feed to text intelligence analyzer if enabled
+                if self.text_analyzer:
+                    self.text_analyzer.add_transcript(transcript)
             else:
                 # Interim result - show on same line
                 print(f"[INTERIM] {speaker}{transcript}", end="\r", flush=True)
@@ -358,6 +545,19 @@ async def main() -> None:
     elif args.transcription_output_path or args.transcription_output_format:
         logger.warning("Both --transcription-output-path and --transcription-output-format " "must be specified to enable transcription output")
 
+    # Initialize Text Intelligence analyzer if any features are enabled
+    text_analyzer: Optional[TextIntelligenceAnalyzer] = None
+    if args.sentiment or args.topics or args.intents or args.summarize:
+        text_analyzer = TextIntelligenceAnalyzer(
+            api_key=deepgram_api_key,
+            sentiment=args.sentiment,
+            topics=args.topics,
+            intents=args.intents,
+            summarize=args.summarize,
+            language=args.language if args.language != "auto" else "en",
+            interval=args.intelligence_interval,
+        )
+
     # Create peer connection
     pc: RTCPeerConnection = RTCPeerConnection()
     pc.addTransceiver("audio", direction="recvonly")
@@ -385,7 +585,13 @@ async def main() -> None:
                 utterance_end_ms=args.utterance_end_ms,
                 endpointing=args.endpointing,
                 vtt_writer=vtt_writer,
+                text_analyzer=text_analyzer,
             )
+
+            # Start the text intelligence analyzer background task
+            if text_analyzer:
+                text_analyzer.start()
+
             await transcriber.start()
 
     # Create offer
@@ -451,6 +657,10 @@ async def main() -> None:
             logger.info("Stopping transcriber")
             transcriber.stop()
 
+        if text_analyzer:
+            logger.info("Stopping text intelligence analyzer")
+            text_analyzer.stop()
+
         logger.info("Closing connection")
         await pc.close()
 
@@ -466,6 +676,8 @@ Examples:
   %(prog)s --participant-id user123 --token eyJ... --language auto --smart-format
   %(prog)s --participant-id user123 --token eyJ... --endpointing 500 --utterance-end-ms 2000
   %(prog)s --participant-id user123 --token eyJ... --transcription-output-path output.vtt --transcription-output-format vtt
+  %(prog)s --participant-id user123 --token eyJ... --sentiment --topics --intelligence-interval 30
+  %(prog)s --participant-id user123 --token eyJ... --sentiment --intents --summarize
 
 Environment variables:
   DEEPGRAM_API_KEY    Deepgram API key (alternative to --deepgram-api-key)
@@ -565,6 +777,19 @@ Environment variables:
         "--transcription-output-format",
         choices=["vtt"],
         help="Format for transcription output file. Currently supported: vtt. Must be used with --transcription-output-path",
+    )
+
+    # Text Intelligence options
+    ti_group = parser.add_argument_group("text intelligence", "Deepgram Read API analysis of transcripts (runs periodically on accumulated text)")
+    ti_group.add_argument("--sentiment", action="store_true", help="Enable sentiment analysis on transcripts")
+    ti_group.add_argument("--topics", action="store_true", help="Enable topic detection on transcripts")
+    ti_group.add_argument("--intents", action="store_true", help="Enable intent recognition on transcripts")
+    ti_group.add_argument("--summarize", action="store_true", help="Enable rolling summarization of transcripts")
+    ti_group.add_argument(
+        "--intelligence-interval",
+        type=int,
+        default=30,
+        help="Interval in seconds between text intelligence analyses (default: 30)",
     )
 
     return parser.parse_args()

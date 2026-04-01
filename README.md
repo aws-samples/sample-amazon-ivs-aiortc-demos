@@ -35,6 +35,7 @@ This project demonstrates how to integrate Amazon IVS services with various AI a
 - **WebRTC Publishing**: Stream video/audio content to IVS stages
 - **WebRTC Subscribing**: Receive and process streams from IVS stages
 - **Real-time Transcription**: Live speech-to-text using OpenAI Whisper or Deepgram
+- **Text Intelligence**: Sentiment analysis, topic detection, intent recognition, and summarization via Deepgram Read API
 - **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
 - **SEI Publishing**: Embed metadata directly into H.264 video streams using SEI NAL units
 - **Event Handling**: Process real-time stage events via WebSocket connections
@@ -562,6 +563,31 @@ python ivs-stage-subscribe-transcribe-deepgram.py \
 - **nova-2-medical**: Medical-focused Nova-2 variant
 - **enhanced**: Enhanced accuracy model
 - **base**: Lightweight model for basic transcription
+
+**Text Intelligence (Deepgram Read API):**
+
+The Deepgram transcription demo can optionally analyze accumulated transcripts using Deepgram's Text Intelligence API. This runs periodically in the background and provides sentiment analysis, topic detection, intent recognition, and rolling summarization.
+
+- `--sentiment`: Enable sentiment analysis (positive/neutral/negative with scores)
+- `--topics`: Enable topic detection across transcripts
+- `--intents`: Enable intent recognition (questions, requests, etc.)
+- `--summarize`: Enable rolling summarization of the full transcript history
+- `--intelligence-interval`: Seconds between analyses (default: 30)
+
+```bash
+# Transcription with sentiment and topic detection
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --sentiment --topics
+
+# Full analysis suite with 60-second intervals
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --sentiment --topics --intents --summarize \
+  --intelligence-interval 60
+```
 
 #### ivs-stage-subscribe-analyze-frames.py
 
@@ -1144,6 +1170,19 @@ python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
   --filler-words \
   --transcription-output-path "meeting.vtt" \
   --transcription-output-format "vtt"
+
+# Transcription with sentiment analysis and topic detection
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --sentiment --topics --intelligence-interval 30
+
+# Full text intelligence suite with summarization
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --sentiment --topics --intents --summarize \
+  --intelligence-interval 60
 ```
 
 #### Video Frame Analysis Examples
