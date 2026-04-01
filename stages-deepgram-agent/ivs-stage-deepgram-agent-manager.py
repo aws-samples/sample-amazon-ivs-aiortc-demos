@@ -90,6 +90,10 @@ class IVSStageDeepgramAgentManager:
             "prompt": "You are a friendly, helpful voice assistant.",
             "greeting": "Hello! How can I help you today?",
             "language": "en",
+            "iceTimeout": 1,
+            "disableFrameAnalysis": False,
+            "bedrockModelId": "us.anthropic.claude-sonnet-4-6",
+            "bedrockRegion": "us-east-1",
         }
 
     async def launch_deepgram_agent_instance(self, stage_arn: str, participant_id: str, config: Dict[str, Any] = None) -> tuple[bool, str]:
@@ -141,6 +145,21 @@ class IVSStageDeepgramAgentManager:
                 language = config.get("language")
                 if language:
                     cmd.extend(["--language", str(language)])
+
+                ice_timeout = config.get("iceTimeout")
+                if ice_timeout is not None:
+                    cmd.extend(["--ice-timeout", str(int(ice_timeout))])
+
+                if config.get("disableFrameAnalysis", False):
+                    cmd.append("--disable-frame-analysis")
+
+                bedrock_model_id = config.get("bedrockModelId")
+                if bedrock_model_id:
+                    cmd.extend(["--bedrock-model-id", str(bedrock_model_id)])
+
+                bedrock_region = config.get("bedrockRegion")
+                if bedrock_region:
+                    cmd.extend(["--bedrock-region", str(bedrock_region)])
 
             logger.info(f"🚀 Launching Deepgram Agent for participant {participant_id}")
             logger.debug(f"Command: {' '.join(cmd)}")
@@ -274,13 +293,19 @@ class IVSStageDeepgramAgentManager:
                 logger.error("❌ Empty stageArn or participantId")
                 return
 
+            # Build config: CLI defaults first, then chat message overrides
+            cli = getattr(self, "cli_defaults", {})
             config = {
-                "voice": data.get("voice", "aura-2-asteria-en"),
-                "thinkProvider": data.get("thinkProvider", "open_ai"),
-                "thinkModel": data.get("thinkModel", "gpt-4o-mini"),
-                "prompt": data.get("prompt"),
-                "greeting": data.get("greeting"),
-                "language": data.get("language"),
+                "voice": data.get("voice") or cli.get("voice") or "aura-2-asteria-en",
+                "thinkProvider": data.get("thinkProvider") or cli.get("thinkProvider") or "open_ai",
+                "thinkModel": data.get("thinkModel") or cli.get("thinkModel") or "gpt-4o-mini",
+                "prompt": data.get("prompt") or cli.get("prompt"),
+                "greeting": data.get("greeting") or cli.get("greeting"),
+                "language": data.get("language") or cli.get("language"),
+                "iceTimeout": data.get("iceTimeout") or cli.get("iceTimeout"),
+                "disableFrameAnalysis": data.get("disableFrameAnalysis", cli.get("disableFrameAnalysis", False)),
+                "bedrockModelId": data.get("bedrockModelId") or cli.get("bedrockModelId"),
+                "bedrockRegion": data.get("bedrockRegion") or cli.get("bedrockRegion"),
             }
 
             success, error_code = await self.launch_deepgram_agent_instance(stage_arn, participant_id, config)
@@ -368,6 +393,20 @@ def parse_args():
     parser.add_argument("--max-instances", type=int, default=5, help="Maximum concurrent agent instances (default: 5)")
     parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
     parser.add_argument("--verbose", action="store_true", help="Stream output from spawned agent instances")
+
+    # Default agent configuration — these are used when the chat message doesn't specify them
+    defaults = parser.add_argument_group("agent defaults", "Default configuration for spawned agents (overridden by chat message payload)")
+    defaults.add_argument("--voice", default=None, help="Default Deepgram TTS voice (default: aura-2-asteria-en)")
+    defaults.add_argument("--think-provider", default=None, choices=["open_ai", "anthropic", "groq"], help="Default LLM provider")
+    defaults.add_argument("--think-model", default=None, help="Default LLM model")
+    defaults.add_argument("--prompt", default=None, help="Default system prompt")
+    defaults.add_argument("--greeting", default=None, help="Default greeting message")
+    defaults.add_argument("--language", default=None, help="Default language code")
+    defaults.add_argument("--ice-timeout", type=int, default=None, help="Default ICE timeout in seconds")
+    defaults.add_argument("--disable-frame-analysis", action="store_true", help="Disable frame analysis by default")
+    defaults.add_argument("--bedrock-model-id", default=None, help="Default Bedrock model for frame analysis")
+    defaults.add_argument("--bedrock-region", default=None, help="Default AWS region for Bedrock")
+
     return parser.parse_args()
 
 
@@ -394,6 +433,21 @@ async def main():
         region=args.region,
         verbose=args.verbose,
     )
+
+    # Store CLI defaults so handle_message can merge them with chat payload
+    manager.cli_defaults = {
+        "voice": args.voice,
+        "thinkProvider": args.think_provider,
+        "thinkModel": args.think_model,
+        "prompt": args.prompt,
+        "greeting": args.greeting,
+        "language": args.language,
+        "iceTimeout": args.ice_timeout,
+        "disableFrameAnalysis": args.disable_frame_analysis,
+        "bedrockModelId": args.bedrock_model_id,
+        "bedrockRegion": args.bedrock_region,
+    }
+
     logger.info(f"👤 Manager User ID: {manager.manager_user_id}")
 
     await manager.run()

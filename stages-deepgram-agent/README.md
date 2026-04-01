@@ -366,23 +366,31 @@ Send this JSON payload as an IVS Chat message to launch an agent:
   "thinkModel": "gpt-4o-mini",
   "prompt": "You are a friendly assistant.",
   "greeting": "Hello! How can I help you today?",
-  "language": "en"
+  "language": "en",
+  "iceTimeout": 1,
+  "disableFrameAnalysis": false,
+  "bedrockModelId": "us.anthropic.claude-sonnet-4-6",
+  "bedrockRegion": "us-east-1"
 }
 ```
 
 ### Message Fields
 
-| Field           | Required | Default             | Description                    |
-| --------------- | -------- | ------------------- | ------------------------------ |
-| `action`        | Yes      | —                   | Must be `"LAUNCH_ASSISTANT"`   |
-| `stageArn`      | Yes      | —                   | ARN of the IVS Stage to join   |
-| `participantId` | Yes      | —                   | Participant ID to subscribe to |
-| `voice`         | No       | `aura-2-asteria-en` | Deepgram TTS voice             |
-| `thinkProvider` | No       | `open_ai`           | LLM provider                   |
-| `thinkModel`    | No       | `gpt-4o-mini`       | LLM model                      |
-| `prompt`        | No       | _(default)_         | System prompt                  |
-| `greeting`      | No       | _(default)_         | Greeting message               |
-| `language`      | No       | `en`                | Language code                  |
+| Field                  | Required | Default                          | Description                      |
+| ---------------------- | -------- | -------------------------------- | -------------------------------- |
+| `action`               | Yes      | —                                | Must be `"LAUNCH_ASSISTANT"`     |
+| `stageArn`             | Yes      | —                                | ARN of the IVS Stage to join     |
+| `participantId`        | Yes      | —                                | Participant ID to subscribe to   |
+| `voice`                | No       | `aura-2-asteria-en`              | Deepgram TTS voice               |
+| `thinkProvider`        | No       | `open_ai`                        | LLM provider                     |
+| `thinkModel`           | No       | `gpt-4o-mini`                    | LLM model                        |
+| `prompt`               | No       | _(default)_                      | System prompt                    |
+| `greeting`             | No       | _(default)_                      | Greeting message                 |
+| `language`             | No       | `en`                             | Language code                    |
+| `iceTimeout`           | No       | `1`                              | ICE gathering timeout in seconds |
+| `disableFrameAnalysis` | No       | `false`                          | Disable video frame analysis     |
+| `bedrockModelId`       | No       | `us.anthropic.claude-sonnet-4-6` | Bedrock model for frame analysis |
+| `bedrockRegion`        | No       | `us-east-1`                      | AWS region for Bedrock           |
 
 ### Frontend Integration
 
