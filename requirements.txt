@@ -35,6 +35,9 @@ Pillow>=10.0.0
 
 pytz
 tzlocal
+# Deepgram real-time transcription
+deepgram-sdk>=3.0.0
+
 # OpenAI Real-time API dependencies
 openai>=1.12.0
 

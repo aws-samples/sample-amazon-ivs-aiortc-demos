@@ -33,6 +33,7 @@ This project demonstrates how to integrate Amazon IVS services with various AI a
 
 - **WebRTC Publishing**: Stream video/audio content to IVS stages
 - **WebRTC Subscribing**: Receive and process streams from IVS stages
+- **Real-time Transcription**: Live speech-to-text using OpenAI Whisper or Deepgram
 - **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
 - **SEI Publishing**: Embed metadata directly into H.264 video streams using SEI NAL units
 - **Event Handling**: Process real-time stage events via WebSocket connections
@@ -61,14 +62,16 @@ amazon-ivs-python-demos/
 │   ├── ivs-channel-subscribe-analyze-frames.py        # Frame analysis with Claude
 │   ├── ivs-channel-subscribe-analyze-video.py         # Video analysis with Pegasus
 │   ├── ivs-channel-subscribe-analyze-audio-video.py   # Combined audio/video analysis
-│   ├── ivs-channel-subscribe-transcribe.py            # Real-time transcription
+│   ├── ivs-channel-subscribe-transcribe.py            # Real-time transcription (Whisper)
+│   ├── ivs-channel-subscribe-transcribe-deepgram.py   # Real-time transcription (Deepgram)
 │   └── ivs_metadata_publisher.py                      # Timed metadata publisher
 ├── stages-publish/                                     # Real-Time Stages publishing
 │   ├── ivs-stage-publish.py                           # Basic media publishing
 │   ├── ivs-stage-publish-events.py                    # Publishing with event handling
 │   └── ivs-stage-pub-sub.py                           # Simultaneous publish/subscribe
 ├── stages-subscribe/                                   # Real-Time Stages subscribing
-│   ├── ivs-stage-subscribe-transcribe.py              # Subscribe with transcription
+│   ├── ivs-stage-subscribe-transcribe.py              # Subscribe with transcription (Whisper)
+│   ├── ivs-stage-subscribe-transcribe-deepgram.py     # Subscribe with transcription (Deepgram)
 │   ├── ivs-stage-subscribe-analyze-frames.py          # Subscribe with AI frame analysis
 │   └── ivs-stage-subscribe-analyze-video.py           # Subscribe with AI video analysis
 ├── stages-nova-s2s/                                    # AI Speech-to-Speech
@@ -87,6 +90,7 @@ amazon-ivs-python-demos/
 - AWS CLI configured with appropriate credentials
 - Amazon IVS Real-Time Stage ARN and participant tokens
 - FFmpeg (for media processing when using transcription demo - not necessary otherwise)
+- Deepgram API key (for Deepgram transcription demo - sign up at [deepgram.com](https://deepgram.com/))
 - Audio input/output devices (for speech-to-speech functionality)
 
 ### AWS Permissions Required
@@ -172,6 +176,9 @@ export WEATHER_API_KEY=your_weather_api_key
 
 # Optional: For web search functionality in Nova speech-to-speech
 export BRAVE_API_KEY=your_brave_api_key
+
+# Optional: For Deepgram real-time transcription
+export DEEPGRAM_API_KEY=your_deepgram_api_key
 ```
 
 ### Weather API (Optional)
@@ -235,6 +242,14 @@ The `channels-subscribe/` directory contains scripts for subscribing to and anal
 - Multiple Whisper models from tiny to large-v3
 - Optional publishing of transcripts as IVS timed metadata
 
+**ivs-channel-subscribe-transcribe-deepgram.py**
+
+- Real-time streaming audio transcription using [Deepgram](https://deepgram.com/) (alternative to Whisper)
+- True streaming transcription via WebSocket (no chunking delay)
+- Speaker diarization, smart formatting, and filler word detection
+- Optional publishing of transcripts as IVS timed metadata
+- No GPU required — all processing happens on Deepgram's servers
+
 **ivs_metadata_publisher.py**
 
 - Reusable module for publishing timed metadata to IVS channels
@@ -250,11 +265,18 @@ python channels-subscribe/ivs-channel-subscribe-analyze-frames.py \
   --playlist-url "https://example.com/playlist.m3u8" \
   --highest-quality
 
-# Real-time transcription with metadata publishing
+# Real-time transcription with Whisper and metadata publishing
 python channels-subscribe/ivs-channel-subscribe-transcribe.py \
   --playlist-url "https://example.com/playlist.m3u8" \
   --language en \
   --whisper-model base \
+  --publish-transcript-as-timed-metadata
+
+# Real-time transcription with Deepgram and metadata publishing
+python channels-subscribe/ivs-channel-subscribe-transcribe-deepgram.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --language en \
+  --diarize \
   --publish-transcript-as-timed-metadata
 
 # Video analysis with TwelveLabs Pegasus
@@ -441,6 +463,100 @@ python ivs-stage-subscribe-transcribe.py \
 - Italian ("it")
 - Portuguese ("pt")
 - And many more supported by Whisper
+
+#### ivs-stage-subscribe-transcribe-deepgram.py
+
+Subscribes to IVS stage audio streams and provides real-time streaming speech-to-text transcription using [Deepgram](https://deepgram.com/) with optional VTT file output. This is an alternative to the Whisper-based transcription demo that uses Deepgram's cloud-based Nova-3 model for true streaming transcription.
+
+**Key Differences from Whisper Demo:**
+
+| Feature             | Whisper                       | Deepgram                             |
+| ------------------- | ----------------------------- | ------------------------------------ |
+| Processing          | Local, batch (5s chunks)      | Cloud, true streaming (word-by-word) |
+| GPU Required        | Recommended for larger models | No (cloud-based)                     |
+| Latency             | 5+ seconds (chunk duration)   | Sub-second (streaming)               |
+| Speaker Diarization | Not built-in                  | Built-in (`--diarize`)               |
+| Interim Results     | No                            | Yes (see words as they're spoken)    |
+| VTT Timestamps      | Fixed chunk boundaries        | Word-level precision                 |
+| Smart Formatting    | No                            | Yes (numbers, dates, currencies)     |
+| Filler Words        | No                            | Yes (`--filler-words`)               |
+
+**Features:**
+
+- True real-time streaming transcription via Deepgram WebSocket API
+- Interim (partial) results displayed as speech is detected
+- Speaker diarization for multi-speaker scenarios
+- Smart formatting for numbers, dates, and currencies
+- Word-level timestamps for precise VTT subtitle output
+- Filler word detection ("uh", "um")
+- Configurable endpointing and utterance detection
+- Automatic language detection
+- No GPU required — all processing happens on Deepgram's servers
+
+**Prerequisites:**
+
+- Deepgram API key — sign up at [deepgram.com](https://deepgram.com/) (free tier available)
+- Set via `--deepgram-api-key` argument or `DEEPGRAM_API_KEY` environment variable
+
+**Usage:**
+
+```bash
+cd stages-subscribe
+
+# Basic transcription
+python ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With speaker diarization and VTT output
+python ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --diarize \
+  --transcription-output-path "output.vtt" \
+  --transcription-output-format "vtt"
+
+# Medical transcription with auto language detection
+python ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --model nova-3-medical \
+  --language auto
+
+# With filler words and custom endpointing
+python ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --filler-words \
+  --endpointing 500
+```
+
+**Command-line Arguments:**
+
+- `--participant-id`: ID of the participant to subscribe to (required)
+- `--token`: JWT participant token with subscribe capabilities (required)
+- `--deepgram-api-key`: Deepgram API key (or set `DEEPGRAM_API_KEY` env var)
+- `--model`: Deepgram model — "nova-3", "nova-3-medical", "nova-2", "nova-2-meeting", "nova-2-finance", etc. (default: "nova-3")
+- `--language`: Language code for transcription, e.g., "en", "en-US", "es", "fr". Use "auto" for automatic detection (default: "en")
+- `--smart-format`: Enable smart formatting for numbers, dates, etc. (default: true)
+- `--diarize`: Enable speaker diarization (default: false)
+- `--filler-words`: Transcribe filler words like "uh" and "um" (default: false)
+- `--interim-results`: Show interim (partial) transcription results (default: true)
+- `--utterance-end-ms`: Silence duration in ms to detect end of utterance (default: 1000)
+- `--endpointing`: Duration in ms of silence before finalizing speech (default: 300)
+- `--transcription-output-path`: Path to save transcription output file (optional)
+- `--transcription-output-format`: Format for transcription output — currently supports "vtt" (optional)
+
+**Available Models:**
+
+- **nova-3** (default): Latest and most accurate general-purpose model
+- **nova-3-medical**: Optimized for medical terminology and conversations
+- **nova-2**: Previous generation, still highly capable
+- **nova-2-meeting**: Optimized for meeting transcription
+- **nova-2-finance**: Optimized for financial terminology
+- **nova-2-medical**: Medical-focused Nova-2 variant
+- **enhanced**: Enhanced accuracy model
+- **base**: Lightweight model for basic transcription
 
 #### ivs-stage-subscribe-analyze-frames.py
 
@@ -774,6 +890,13 @@ python channels-subscribe/ivs-channel-subscribe-transcribe.py \
   --whisper-model base \
   --publish-transcript-as-timed-metadata
 
+# Real-time transcription with Deepgram (streaming, no GPU needed)
+python channels-subscribe/ivs-channel-subscribe-transcribe-deepgram.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality \
+  --diarize \
+  --publish-transcript-as-timed-metadata
+
 # Comprehensive video analysis with TwelveLabs Pegasus
 python channels-subscribe/ivs-channel-subscribe-analyze-video.py \
   --playlist-url "https://example.com/playlist.m3u8" \
@@ -833,7 +956,7 @@ python stages-publish/ivs-stage-publish-events.py \
 #### Transcription Examples
 
 ```bash
-# Basic transcription (console output only)
+# Basic transcription with Whisper (console output only)
 python stages-subscribe/ivs-stage-subscribe-transcribe.py \
   --participant-id "participant123" \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
@@ -860,6 +983,40 @@ python stages-subscribe/ivs-stage-subscribe-transcribe.py \
   --language "en" \
   --chunk-duration "10" \
   --transcription-output-path "meeting_transcript.vtt" \
+  --transcription-output-format "vtt"
+```
+
+#### Deepgram Transcription Examples
+
+```bash
+# Basic Deepgram transcription (streaming, no GPU needed)
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With speaker diarization
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --diarize
+
+# Medical transcription with auto language detection and VTT output
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --model nova-3-medical \
+  --language auto \
+  --transcription-output-path "medical_transcript.vtt" \
+  --transcription-output-format "vtt"
+
+# Meeting transcription with diarization and filler words
+python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --model nova-2-meeting \
+  --diarize \
+  --filler-words \
+  --transcription-output-path "meeting.vtt" \
   --transcription-output-format "vtt"
 ```
 
@@ -1025,24 +1182,28 @@ aws ivs-realtime create-participant-token \
 #### IVS Channels Issues
 
 1. **"No audio stream found"**
-
    - Check if the M3U8 stream contains audio using `ffprobe`
    - Try different rendition quality options
    - Verify stream accessibility with `curl`
 
 2. **"Unable to open video stream"**
-
    - Verify M3U8 URL is accessible
    - Check network connectivity and firewall settings
    - Try different rendition selections
 
 3. **Whisper Model Issues**
-
    - Clear Whisper cache: `rm -rf ~/.cache/whisper/`
    - Use smaller models for memory-constrained environments
    - Enable FP16 for faster processing
 
-4. **Timed Metadata Publishing Issues**
+4. **Deepgram Connection Issues**
+   - Verify your Deepgram API key is valid and has sufficient credits
+   - Check network connectivity to `api.deepgram.com`
+   - Ensure the `deepgram-sdk` package is installed: `pip install deepgram-sdk`
+   - If transcription stops unexpectedly, check Deepgram's [status page](https://status.deepgram.com/)
+   - For language auto-detection issues, try specifying the language explicitly
+
+5. **Timed Metadata Publishing Issues**
    - Verify AWS credentials have `ivs:PutMetadata` permissions
    - Check rate limiting (5 RPS per channel, 155 RPS per account)
    - Ensure channel ARN extraction is working correctly
@@ -1050,13 +1211,11 @@ aws ivs-realtime create-participant-token \
 #### IVS Real-Time Stages Issues
 
 1. **Audio Quality Problems**
-
    - Ensure consistent chunk sizes (512 samples recommended)
    - Check audio resampling configuration
    - Verify WebRTC connection stability
 
 2. **WebRTC Connection Failures**
-
    - Verify JWT token has correct capabilities
    - Check network connectivity and firewall settings
    - Ensure SDP munging is applied correctly
@@ -1069,7 +1228,6 @@ aws ivs-realtime create-participant-token \
 #### General Issues
 
 1. **Video Frame Analysis Issues**
-
    - Verify AWS credentials have `bedrock:InvokeModel` permissions
    - Check Claude/Pegasus model availability in your region
    - Monitor analysis costs with appropriate intervals
@@ -1079,6 +1237,7 @@ aws ivs-realtime create-participant-token \
    - Use appropriate Whisper model size for your use case
    - Ensure clean audio input
    - Consider language-specific models
+   - For Deepgram, try domain-specific models (e.g., `nova-3-medical`, `nova-2-meeting`)
 
 ### Debug Mode
 
@@ -1095,14 +1254,12 @@ python your-script.py --your-args
 #### IVS Channels Optimization
 
 1. **For Channel Transcription:**
-
    - Use `--whisper-model tiny` or `--whisper-model base` for real-time processing
    - Enable FP16: `--fp16 true`
    - Use shorter chunks: `--chunk-duration 3`
    - Specify language: `--language en` (faster than auto-detect)
 
 2. **For Channel Video Analysis:**
-
    - Use `--lowest-quality` for faster processing
    - Adjust `--analysis-duration` based on content complexity
    - Run without `--show-video` for headless operation
@@ -1115,14 +1272,12 @@ python your-script.py --your-args
 #### IVS Real-Time Stages Optimization
 
 1. **Connection Speed:**
-
    - Use `--ice-timeout 1` for faster WebRTC connection establishment (default)
    - Original WebRTC ICE timeout is 5 seconds, optimized to 1 second for better user experience
    - Increase timeout if experiencing connection issues in poor network conditions
    - This optimization reduces startup time from ~11 seconds to ~3 seconds
 
 2. **For Nova Sonic:**
-
    - Use consistent 1ms delays between audio chunks
    - Implement proper buffering strategies
    - Monitor memory usage during long sessions
@@ -1133,6 +1288,13 @@ python your-script.py --your-args
    - Consider GPU acceleration for large models
    - Use VTT output for live captioning applications
    - Specify language explicitly for better accuracy and performance
+
+4. **For Deepgram Transcription:**
+   - Use `--endpointing 300` (default) for a good balance of speed and accuracy
+   - Lower endpointing values (e.g., 100) give faster results but may split mid-sentence
+   - Specify language explicitly rather than using `auto` for better accuracy and lower latency
+   - Use `--model nova-3` (default) for best accuracy, or domain-specific models for specialized content
+   - Enable `--diarize` only when needed — it adds slight processing overhead
 
 #### General Optimization
 
@@ -1158,6 +1320,7 @@ python your-script.py --your-args
 ### AI/ML Dependencies
 
 - `whisper` (from GitHub) - Speech recognition
+- `deepgram-sdk>=3.0.0` - Deepgram real-time transcription
 - `boto3>=1.34.0` - AWS SDK for Bedrock and IVS
 - `aws-sdk-bedrock-runtime` - Amazon Bedrock client
 - `smithy-aws-core>=0.0.1` - AWS SDK core
@@ -1196,7 +1359,8 @@ For issues related to:
 - **Amazon Bedrock**: Check the [Bedrock User Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/)
 - **aiortc**: Check the [aiortc documentation](https://aiortc.readthedocs.io/)
 - **OpenAI Whisper**: Check the [Whisper repository](https://github.com/openai/whisper)
+- **Deepgram**: Check the [Deepgram documentation](https://developers.deepgram.com/docs) and [API reference](https://developers.deepgram.com/reference/deepgram-api-overview)
 
 ---
 
-_This project demonstrates advanced integration patterns between Amazon IVS services and AI capabilities. From real-time conversational AI with Nova Sonic to comprehensive video analysis with Claude and TwelveLabs Pegasus, these demos showcase the power of combining live video streaming with cutting-edge AI services._
+_This project demonstrates advanced integration patterns between Amazon IVS services and AI capabilities. From real-time conversational AI with Nova Sonic to comprehensive video analysis with Claude and TwelveLabs Pegasus, and streaming transcription with Deepgram and Whisper, these demos showcase the power of combining live video streaming with cutting-edge AI services._
