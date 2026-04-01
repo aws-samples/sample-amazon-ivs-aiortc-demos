@@ -56,7 +56,7 @@ This project demonstrates how to integrate Amazon IVS services with various AI a
 ## Project Structure
 
 ```
-amazon-ivs-python-demos/
+sample-amazon-ivs-python-demos/
 ├── README.md                                           # This file
 ├── requirements.txt                                    # Python dependencies
 ├── channels-subscribe/                                 # IVS Channel analysis tools
@@ -121,7 +121,7 @@ Your AWS credentials need the following permissions:
 1. **Clone and navigate to the project directory:**
 
    ```bash
-   cd /amazon-ivs-aiortc-demos
+   cd /sample-amazon-ivs-python-demos
    ```
 
 2. **Create and activate a virtual environment:**
