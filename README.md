@@ -936,7 +936,9 @@ Chat message payload to launch an agent:
   "thinkProvider": "open_ai",
   "thinkModel": "gpt-4o-mini",
   "prompt": "You are a friendly assistant.",
-  "greeting": "Hello!"
+  "greeting": "Hello!",
+  "disableFrameAnalysis": false,
+  "bedrockModelId": "us.anthropic.claude-sonnet-4-6"
 }
 ```
 
