@@ -83,6 +83,7 @@ sample-amazon-ivs-python-demos/
 │   └── ivs-stage-gpt-realtime.py                       # gpt-realtime integration
 ├── stages-deepgram-agent/                                  # Deepgram Voice Agent
 │   ├── ivs-stage-deepgram-agent.py                     # Deepgram Agent integration
+│   ├── ivs-stage-deepgram-group-agent.py               # Multi-participant wake-word agent
 │   ├── ivs-stage-deepgram-agent-manager.py             # Multi-instance manager via IVS Chat
 │   └── deepgram_agent_manager.py                       # Deepgram Agent WebSocket manager
 ├── stages-deepgram-scribe/                                 # Deepgram Meeting Scribe
@@ -1380,6 +1381,23 @@ python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
   --subscribe-to "participant123" \
   --prompt "You are a sports commentator. Be energetic and exciting." \
   --greeting "Welcome to the show!"
+```
+
+#### Group Agent Examples
+
+```bash
+# Wake-word activated agent in a multi-participant stage
+python stages-deepgram-agent/ivs-stage-deepgram-group-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --wake-word "hey assistant"
+
+# Custom wake/sleep words with extended context
+python stages-deepgram-agent/ivs-stage-deepgram-group-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --wake-word "ok agent" \
+  --sleep-word "goodbye agent" \
+  --context-window 120 \
+  --active-listening-window 15
 ```
 
 #### Meeting Scribe Examples

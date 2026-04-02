@@ -314,6 +314,73 @@ Custom `VideoStreamTrack` that generates visual feedback:
 
 ---
 
+## Group Agent (Multi-Participant Wake Word)
+
+The `ivs-stage-deepgram-group-agent.py` script is a passive voice agent for multi-participant stages. It transcribes all speakers, publishes transcripts via SEI, and only responds when someone says the configurable wake word.
+
+### How It Works
+
+1. Joins the stage and publishes agent audio/video tracks
+2. Monitors stage events to detect participants joining/leaving
+3. Subscribes to each participant's audio with a dedicated Deepgram STT connection (with `keyterm` boosting for the wake word)
+4. Maintains a rolling transcript buffer (configurable window, default 60s)
+5. When the wake word is detected in a transcript, injects the conversation context + user message into the Deepgram Voice Agent
+6. The agent speaks its response through the published audio track
+7. After responding, enters an active listening window (default 10s) where follow-up questions don't need the wake word
+
+### Usage
+
+```bash
+# Basic — responds to "hey assistant", silenced by "thank you assistant"
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "hey assistant"
+
+# Custom wake/sleep words with longer context
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "ok agent" \
+  --sleep-word "goodbye agent" \
+  --context-window 120 \
+  --active-listening-window 15
+
+# With custom voice and LLM
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "hey deepgram" \
+  --voice aura-2-orion-en \
+  --think-model gpt-4o
+
+# Without vision (no AWS dependency)
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "hey assistant" \
+  --disable-frame-analysis
+```
+
+### Group Agent Arguments
+
+| Argument                    | Default                          | Description                                                   |
+| --------------------------- | -------------------------------- | ------------------------------------------------------------- |
+| `--token`                   | _(required)_                     | IVS participant token (PUBLISH + SUBSCRIBE)                   |
+| `--deepgram-api-key`        | `DEEPGRAM_API_KEY` env var       | Deepgram API key                                              |
+| `--wake-word`               | `hey assistant`                  | Phrase that activates the agent                               |
+| `--sleep-word`              | `thank you assistant`            | Phrase that silences the agent and ends active listening      |
+| `--context-window`          | `60`                             | Seconds of conversation history to include as context         |
+| `--active-listening-window` | `10`                             | Seconds to stay active after responding (no wake word needed) |
+| `--model`                   | `nova-3`                         | Deepgram STT model                                            |
+| `--language`                | `en`                             | Language code or `auto`                                       |
+| `--voice`                   | `aura-2-asteria-en`              | Deepgram TTS voice                                            |
+| `--think-model`             | `gpt-4o-mini`                    | LLM model                                                     |
+| `--think-provider`          | `open_ai`                        | LLM provider (`open_ai`, `anthropic`, `groq`)                 |
+| `--prompt`                  | _(meeting assistant)_            | Base system prompt                                            |
+| `--disable-frame-analysis`  | _(enabled)_                      | Disable vision via Bedrock Claude                             |
+| `--bedrock-model-id`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model for frame analysis                              |
+| `--bedrock-region`          | `us-east-1`                      | AWS region for Bedrock                                        |
+| `--ice-timeout`             | `1`                              | ICE gathering timeout in seconds                              |
+
+---
+
 ## Assistant Manager
 
 The `ivs-stage-deepgram-agent-manager.py` script enables dynamic, multi-instance management of Deepgram Voice Agents via IVS Chat WebSocket messages.

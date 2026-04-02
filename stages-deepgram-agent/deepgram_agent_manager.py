@@ -87,6 +87,7 @@ class DeepgramAgentManager:
         self._ctx = None
         self._listen_task: Optional[asyncio.Task] = None
         self._should_stop = False
+        self._muted = False  # When True, incoming agent audio is dropped
 
         # SEI publisher for embedding transcripts in video stream
         self.sei_publisher = None
@@ -247,7 +248,7 @@ class DeepgramAgentManager:
             # Binary audio data comes as raw bytes
             if isinstance(message, bytes):
                 self._audio_bytes_received += len(message)
-                if self.agent_audio_track:
+                if self.agent_audio_track and not self._muted:
                     asyncio.ensure_future(self.agent_audio_track.add_audio_data(message))
                 return
 
@@ -295,6 +296,7 @@ class DeepgramAgentManager:
 
             elif msg_type == "AgentAudioDone":
                 logger.debug("🔇 Agent finished speaking")
+                self._muted = False  # Unmute for next response
                 if self.agent_video_track:
                     self.agent_video_track.update_throb_level(0.0)
 
