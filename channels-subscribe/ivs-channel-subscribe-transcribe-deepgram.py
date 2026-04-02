@@ -46,6 +46,7 @@ class DeepgramChannelTranscriber:
         endpointing: int = 300,
         metadata_publisher: Optional[IVSMetadataPublisher] = None,
         playlist_url: Optional[str] = None,
+        publish_interim_metadata: bool = False,
     ) -> None:
         self.deepgram_api_key: str = deepgram_api_key
         self.language: str = language
@@ -58,6 +59,7 @@ class DeepgramChannelTranscriber:
         self.endpointing: int = endpointing
         self.metadata_publisher: Optional[IVSMetadataPublisher] = metadata_publisher
         self.playlist_url: Optional[str] = playlist_url
+        self.publish_interim_metadata: bool = publish_interim_metadata
 
         self._resampler: av.AudioResampler = av.AudioResampler(format="s16", layout="mono", rate=SAMPLE_RATE)
         self._connection = None
@@ -245,6 +247,17 @@ class DeepgramChannelTranscriber:
             else:
                 print(f"[INTERIM] {speaker}{transcript}", end="\r", flush=True)
 
+                # Publish interim results as timed metadata if enabled
+                if self.publish_interim_metadata and self.metadata_publisher and self.playlist_url:
+                    try:
+                        interim_json = json.dumps(
+                            {"interim_transcript": f"{speaker}{transcript}", "is_final": False},
+                            ensure_ascii=False,
+                        )
+                        asyncio.ensure_future(self.metadata_publisher.publish_transcript(self.playlist_url, interim_json))
+                    except Exception:
+                        pass
+
         except Exception as e:
             logger.error(f"Error processing Deepgram message: {e}")
             traceback.print_exc()
@@ -374,6 +387,7 @@ async def run_transcription(args: argparse.Namespace, stream_url: str) -> None:
         endpointing=args.endpointing,
         metadata_publisher=metadata_publisher,
         playlist_url=args.playlist_url if args.publish_transcript_as_timed_metadata else None,
+        publish_interim_metadata=args.publish_interim_metadata,
     )
 
     # Connect to Deepgram
@@ -404,7 +418,18 @@ async def run_transcription(args: argparse.Namespace, stream_url: str) -> None:
         """Run the blocking PyAV demux in a separate thread, pushing frames to the queue."""
         try:
             logger.info("🔗 Opening stream with PyAV...")
-            container = av.open(stream_url)
+            # Use low-latency HLS options to reduce buffering delay.
+            # By default PyAV/FFmpeg buffers several segments before starting,
+            # adding ~3s of extra latency on top of normal HLS delay.
+            container = av.open(
+                stream_url,
+                options={
+                    "fflags": "nobuffer",
+                    "flags": "low_delay",
+                    "analyzeduration": "500000",  # 0.5s instead of default 5s
+                    "probesize": "500000",  # 500KB instead of default 5MB
+                },
+            )
 
             video_stream = None
             audio_stream = None
@@ -570,6 +595,12 @@ Environment variables:
         "--publish-transcript-as-timed-metadata",
         action="store_true",
         help="Publish transcripts as IVS timed metadata to the channel",
+    )
+
+    parser.add_argument(
+        "--publish-interim-metadata",
+        action="store_true",
+        help="Also publish interim (partial) transcripts as timed metadata. Requires --publish-transcript-as-timed-metadata and --interim-results",
     )
 
     quality_group = parser.add_mutually_exclusive_group()

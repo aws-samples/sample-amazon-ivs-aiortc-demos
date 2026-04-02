@@ -18,6 +18,7 @@ A comprehensive collection of Python demo scripts demonstrating various Amazon I
   - [Stages Nova Speech-to-Speech](#stages-nova-speech-to-speech)
   - [Stages OpenAI Real-time API](#stages-openai-real-time-api)
   - [Stages Deepgram Voice Agent](#stages-deepgram-voice-agent)
+  - [Stages Deepgram Meeting Scribe](#stages-deepgram-meeting-scribe)
   - [Stages SEI Publishing](#stages-sei-publishing)
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
@@ -84,6 +85,10 @@ sample-amazon-ivs-python-demos/
 │   ├── ivs-stage-deepgram-agent.py                     # Deepgram Agent integration
 │   ├── ivs-stage-deepgram-agent-manager.py             # Multi-instance manager via IVS Chat
 │   └── deepgram_agent_manager.py                       # Deepgram Agent WebSocket manager
+├── stages-deepgram-scribe/                                 # Deepgram Meeting Scribe
+│   ├── ivs-stage-deepgram-scribe.py                    # Meeting scribe (multi-participant)
+│   ├── scribe_video_track.py                           # Static logo video track
+│   └── robot-icon.png                                  # Scribe video icon image
 └── stages_sei/                                         # SEI Publishing System
     ├── SEI.md                                          # SEI documentation and usage guide
     ├── sei_publisher.py                                # High-level SEI message publishing
@@ -970,6 +975,50 @@ Chat message payload to launch an agent:
 
 For detailed documentation including all voices, SEI transcript format, troubleshooting, and frontend integration examples, see **[`stages-deepgram-agent/README.md`](stages-deepgram-agent/README.md)**.
 
+### Stages Deepgram Meeting Scribe
+
+The `stages-deepgram-scribe/` directory contains an AI meeting scribe that joins an IVS stage as a silent participant, transcribes all speakers, and publishes transcripts and intelligence insights via SEI metadata.
+
+**Features:**
+
+- Multi-participant transcription — automatically subscribes to every publishing participant
+- Dynamic join/leave tracking via stage events WebSocket
+- Per-speaker Deepgram STT connections with diarization
+- Text Intelligence: sentiment, topics, intents, and rolling summarization
+- SEI transcript and intelligence publishing embedded in H.264 video
+- Static robot icon video track with silent audio
+
+**Usage:**
+
+```bash
+cd stages-deepgram-scribe
+
+# Basic meeting transcription
+python ivs-stage-deepgram-scribe.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With full text intelligence suite
+python ivs-stage-deepgram-scribe.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --sentiment --topics --intents --summarize \
+  --intelligence-interval 60
+```
+
+**Command-line Arguments:**
+
+- `--token`: IVS participant token with PUBLISH and SUBSCRIBE capabilities (required)
+- `--deepgram-api-key`: Deepgram API key (or set `DEEPGRAM_API_KEY` env var)
+- `--model`: Deepgram STT model (default: "nova-3")
+- `--language`: Language code or "auto" (default: "en")
+- `--diarize`: Speaker diarization (default: true)
+- `--sentiment`: Enable sentiment analysis
+- `--topics`: Enable topic detection
+- `--intents`: Enable intent recognition
+- `--summarize`: Enable rolling summarization
+- `--intelligence-interval`: Seconds between analyses (default: 30)
+
+For detailed documentation, see **[`stages-deepgram-scribe/README.md`](stages-deepgram-scribe/README.md)**.
+
 ### Stages SEI Publishing
 
 The `stages_sei/` directory contains a comprehensive SEI (Supplemental Enhancement Information) publishing system for embedding metadata directly into H.264 video streams.
@@ -1331,6 +1380,25 @@ python stages-deepgram-agent/ivs-stage-deepgram-agent.py \
   --subscribe-to "participant123" \
   --prompt "You are a sports commentator. Be energetic and exciting." \
   --greeting "Welcome to the show!"
+```
+
+#### Meeting Scribe Examples
+
+```bash
+# Basic meeting scribe — transcribes all participants
+python stages-deepgram-scribe/ivs-stage-deepgram-scribe.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With full text intelligence
+python stages-deepgram-scribe/ivs-stage-deepgram-scribe.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --sentiment --topics --intents --summarize
+
+# Medical meeting with auto language detection
+python stages-deepgram-scribe/ivs-stage-deepgram-scribe.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --model nova-3-medical --language auto \
+  --sentiment --summarize --intelligence-interval 60
 ```
 
 #### Publish and Subscribe Example
