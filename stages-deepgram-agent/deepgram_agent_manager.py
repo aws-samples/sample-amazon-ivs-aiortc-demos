@@ -12,7 +12,7 @@ import io
 import json
 import logging
 import time
-from typing import Optional, Callable, Any
+from typing import Optional, Dict, Callable, Any
 
 import boto3
 from PIL import Image
@@ -56,6 +56,7 @@ class DeepgramAgentManager:
         enable_frame_analysis: bool = True,
         bedrock_model_id: str = "us.anthropic.claude-sonnet-4-6",
         bedrock_region: str = "us-east-1",
+        speak_config: Optional[Dict] = None,
     ):
         self.api_key = api_key
         self.agent_audio_track = agent_audio_track
@@ -67,6 +68,7 @@ class DeepgramAgentManager:
         self.greeting = greeting
         self.language = language
         self.output_sample_rate = output_sample_rate
+        self.speak_config = speak_config  # Optional override for TTS provider
 
         # Frame analysis (vision via Bedrock Claude)
         self.enable_frame_analysis = enable_frame_analysis
@@ -178,7 +180,8 @@ class DeepgramAgentManager:
                     }
                 },
                 "think": think_config,
-                "speak": {
+                "speak": self.speak_config
+                or {
                     "provider": {
                         "type": "deepgram",
                         "model": self.voice,
@@ -189,6 +192,8 @@ class DeepgramAgentManager:
         )
 
         logger.info(f"📤 Sending agent settings (voice={self.voice}, think={self.think_model})")
+        if self.speak_config:
+            logger.info(f"📋 BYO TTS speak config: {json.dumps(self.speak_config, default=str)}")
         await self._connection.send_settings(settings)
         logger.info("✅ Deepgram Voice Agent initialized")
 

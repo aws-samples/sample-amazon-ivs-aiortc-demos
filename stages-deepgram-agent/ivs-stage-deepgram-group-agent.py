@@ -163,6 +163,7 @@ class GroupAgent:
         enable_frame_analysis=True,
         bedrock_model_id="us.anthropic.claude-sonnet-4-6",
         bedrock_region="us-east-1",
+        speak_config=None,
     ):
         self.token = token
         self.deepgram_api_key = deepgram_api_key
@@ -210,6 +211,7 @@ class GroupAgent:
             enable_frame_analysis=enable_frame_analysis,
             bedrock_model_id=bedrock_model_id,
             bedrock_region=bedrock_region,
+            speak_config=speak_config,
         )
 
         # Use the agent manager's SEI publisher — it's set as global for the H.264 patch
@@ -605,6 +607,17 @@ Environment variables:
     parser.add_argument("--bedrock-model-id", default="us.anthropic.claude-sonnet-4-6", help="Bedrock model for frame analysis")
     parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock")
     parser.add_argument("--ice-timeout", type=int, default=1, help="ICE timeout in seconds (default: 1)")
+
+    # BYO TTS provider options
+    tts = parser.add_argument_group("tts provider", "Third-party TTS provider (overrides --voice). See Deepgram docs for details.")
+    tts.add_argument("--tts-provider", default=None, choices=["deepgram", "open_ai", "eleven_labs", "cartesia", "aws_polly"],
+                     help="TTS provider type (default: deepgram)")
+    tts.add_argument("--tts-model", default=None, help="TTS model ID (e.g., 'tts-1' for OpenAI, 'eleven_turbo_v2_5' for ElevenLabs)")
+    tts.add_argument("--tts-voice", default=None, help="TTS voice ID (provider-specific)")
+    tts.add_argument("--tts-endpoint-url", default=None, help="TTS API endpoint URL (required for BYO providers)")
+    tts.add_argument("--tts-api-key", default=None, help="TTS provider API key (used in endpoint headers)")
+    tts.add_argument("--tts-language", default=None, help="TTS language code (for providers that require it)")
+
     return parser.parse_args()
 
 
@@ -637,6 +650,51 @@ async def main():
     logger.info(f"🧠 Think: {args.think_provider}/{args.think_model}")
     logger.info(f"🔍 Frame analysis: {'disabled' if args.disable_frame_analysis else 'enabled'}")
 
+    # Build BYO TTS speak config if a third-party provider is specified
+    speak_config = None
+    if args.tts_provider and args.tts_provider != "deepgram":
+        provider_config = {"type": args.tts_provider}
+
+        if args.tts_provider == "open_ai":
+            provider_config["model"] = args.tts_model or "tts-1"
+            provider_config["voice"] = args.tts_voice or "alloy"
+        elif args.tts_provider == "eleven_labs":
+            provider_config["model_id"] = args.tts_model or "eleven_turbo_v2_5"
+            if args.tts_language:
+                provider_config["language_code"] = args.tts_language
+        elif args.tts_provider == "cartesia":
+            provider_config["model_id"] = args.tts_model or "sonic-2"
+            if args.tts_voice:
+                provider_config["voice"] = {"mode": "id", "id": args.tts_voice}
+            if args.tts_language:
+                provider_config["language"] = args.tts_language
+        elif args.tts_provider == "aws_polly":
+            provider_config["voice"] = args.tts_voice or "Matthew"
+            provider_config["engine"] = "standard"
+            if args.tts_language:
+                provider_config["language_code"] = args.tts_language
+
+        speak_config = {"provider": provider_config}
+
+        # Add endpoint if specified (required for BYO providers)
+        if args.tts_endpoint_url:
+            endpoint = {"url": args.tts_endpoint_url}
+            if args.tts_api_key:
+                # Set auth header based on provider type
+                if args.tts_provider == "open_ai":
+                    endpoint["headers"] = {"authorization": f"Bearer {args.tts_api_key}"}
+                elif args.tts_provider == "eleven_labs":
+                    endpoint["headers"] = {"xi-api-key": args.tts_api_key, "Content-Type": "application/json"}
+                elif args.tts_provider == "cartesia":
+                    endpoint["headers"] = {"x-api-key": args.tts_api_key}
+            speak_config["endpoint"] = endpoint
+
+        logger.info(f"🗣️  TTS provider: {args.tts_provider} (model: {args.tts_model or 'default'})")
+        logger.info(f"📋 Speak config: {json.dumps(speak_config, indent=2)}")
+    elif args.tts_provider == "deepgram":
+        # Explicit deepgram — use --voice as normal
+        logger.info(f"🗣️  TTS: Deepgram ({args.voice})")
+
     agent = GroupAgent(
         token=args.token,
         deepgram_api_key=deepgram_api_key,
@@ -653,6 +711,7 @@ async def main():
         enable_frame_analysis=not args.disable_frame_analysis,
         bedrock_model_id=args.bedrock_model_id,
         bedrock_region=args.bedrock_region,
+        speak_config=speak_config,
     )
 
     try:

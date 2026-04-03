@@ -378,6 +378,49 @@ python ivs-stage-deepgram-group-agent.py \
 | `--bedrock-model-id`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model for frame analysis                              |
 | `--bedrock-region`          | `us-east-1`                      | AWS region for Bedrock                                        |
 | `--ice-timeout`             | `1`                              | ICE gathering timeout in seconds                              |
+| `--tts-provider`            | _(deepgram)_                     | BYO TTS: `open_ai`, `eleven_labs`, `cartesia`, `aws_polly`    |
+| `--tts-model`               | _(provider default)_             | TTS model ID (provider-specific)                              |
+| `--tts-voice`               | _(provider default)_             | TTS voice ID (provider-specific)                              |
+| `--tts-endpoint-url`        | —                                | TTS API endpoint URL (required for BYO providers)             |
+| `--tts-api-key`             | —                                | TTS provider API key                                          |
+| `--tts-language`            | —                                | TTS language code (for providers that require it)             |
+
+### BYO Third-Party TTS
+
+The group agent supports third-party TTS providers via Deepgram's BYO TTS feature. This lets you use OpenAI, ElevenLabs, Cartesia, or AWS Polly voices while keeping Deepgram's STT and agent orchestration.
+
+```bash
+# OpenAI TTS
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "hey assistant" \
+  --tts-provider open_ai \
+  --tts-model tts-1 \
+  --tts-voice alloy \
+  --tts-endpoint-url "https://api.openai.com/v1/audio/speech" \
+  --tts-api-key "$OPENAI_API_KEY"
+
+# ElevenLabs TTS
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "hey assistant" \
+  --tts-provider eleven_labs \
+  --tts-model eleven_turbo_v2_5 \
+  --tts-endpoint-url "https://api.elevenlabs.io/v1/text-to-speech/YOUR_VOICE_ID/stream" \
+  --tts-api-key "$ELEVEN_LABS_API_KEY"
+
+# Cartesia TTS
+python ivs-stage-deepgram-group-agent.py \
+  --token "eyJ..." \
+  --wake-word "hey assistant" \
+  --tts-provider cartesia \
+  --tts-model sonic-2 \
+  --tts-voice "a167e0f3-df7e-4d52-a9c3-f949145efdab" \
+  --tts-endpoint-url "https://api.cartesia.ai/tts/bytes" \
+  --tts-api-key "$CARTESIA_API_KEY"
+```
+
+See [Deepgram BYO TTS docs](https://developers.deepgram.com/docs/voice-agent-tts-models#byo-third-party-tts-models) for full provider details and voice IDs.
 
 ---
 
