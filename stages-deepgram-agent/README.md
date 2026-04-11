@@ -53,17 +53,17 @@ Supporting module:
 
 ## How It Compares
 
-| Feature               | Nova S2S              | GPT Real-time     | Deepgram Agent                         |
-| --------------------- | --------------------- | ----------------- | -------------------------------------- |
-| STT                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Nova-3                        |
-| LLM                   | Nova Sonic (built-in) | GPT-4o (built-in) | Configurable (OpenAI, Anthropic, Groq) |
-| TTS                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Aura 2 (50+ voices)           |
-| Vision                | Bedrock Claude (tool) | OpenAI native     | Bedrock Claude (tool)                  |
-| WebSocket Connections | 1 (Bedrock)           | 1 (OpenAI)        | 1 (Deepgram)                           |
-| AWS Dependency        | Yes (Bedrock)         | No                | Optional (Bedrock for vision only)     |
-| LLM Flexibility       | Fixed                 | Fixed             | Swappable at launch                    |
-| SEI Transcripts       | Yes                   | Yes               | Yes                                    |
-| Visual Feedback       | Yes                   | Yes               | Yes                                    |
+| Feature               | Nova S2S              | GPT Real-time     | Deepgram Agent                         | ElevenLabs Agent                               |
+| --------------------- | --------------------- | ----------------- | -------------------------------------- | ---------------------------------------------- |
+| STT                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Nova-3                        | ElevenLabs (built-in)                          |
+| LLM                   | Nova Sonic (built-in) | GPT-4o (built-in) | Configurable (OpenAI, Anthropic, Groq) | Configurable (OpenAI, Anthropic, Google, more) |
+| TTS                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Aura 2 (50+ voices)           | ElevenLabs (thousands of voices)               |
+| Vision                | Bedrock Claude (tool) | OpenAI native     | Bedrock Claude (tool)                  | Bedrock Claude (client tool)                   |
+| WebSocket Connections | 1 (Bedrock)           | 1 (OpenAI)        | 1 (Deepgram)                           | 1 (ElevenLabs)                                 |
+| AWS Dependency        | Yes (Bedrock)         | No                | Optional (Bedrock for vision only)     | Optional (Bedrock for vision only)             |
+| LLM Flexibility       | Fixed                 | Fixed             | Swappable at launch                    | Swappable at launch                            |
+| SEI Transcripts       | Yes                   | Yes               | Yes                                    | Yes                                            |
+| Visual Feedback       | Yes                   | Yes               | Yes                                    | Yes                                            |
 
 ## Prerequisites
 

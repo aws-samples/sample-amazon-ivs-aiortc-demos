@@ -19,6 +19,8 @@ A comprehensive collection of Python demo scripts demonstrating various Amazon I
   - [Stages OpenAI Real-time API](#stages-openai-real-time-api)
   - [Stages Deepgram Voice Agent](#stages-deepgram-voice-agent)
   - [Stages Deepgram Meeting Scribe](#stages-deepgram-meeting-scribe)
+  - [Stages ElevenLabs Voice Agent](#stages-elevenlabs-voice-agent)
+  - [Stages ElevenLabs Meeting Transcriber](#stages-elevenlabs-meeting-transcriber)
   - [Stages SEI Publishing](#stages-sei-publishing)
 - [Usage Examples](#usage-examples)
 - [Troubleshooting](#troubleshooting)
@@ -35,9 +37,11 @@ This project demonstrates how to integrate Amazon IVS services with various AI a
 
 - **WebRTC Publishing**: Stream video/audio content to IVS stages
 - **WebRTC Subscribing**: Receive and process streams from IVS stages
-- **Real-time Transcription**: Live speech-to-text using OpenAI Whisper or Deepgram
+- **Real-time Transcription**: Live speech-to-text using OpenAI Whisper, Deepgram, or ElevenLabs
 - **Text Intelligence**: Sentiment analysis, topic detection, intent recognition, and summarization via Deepgram Read API
 - **AI Speech-to-Speech**: Integrate Amazon Nova Sonic for conversational AI
+- **ElevenLabs Conversational AI**: Voice agent with configurable LLM, thousands of voices, and vision capabilities
+- **ElevenLabs Meeting Transcriber**: Multi-participant transcription with SEI metadata publishing
 - **SEI Publishing**: Embed metadata directly into H.264 video streams using SEI NAL units
 - **Event Handling**: Process real-time stage events via WebSocket connections
 - **Audio Visualization**: Generate dynamic audio visualizations
@@ -67,6 +71,7 @@ sample-amazon-ivs-python-demos/
 │   ├── ivs-channel-subscribe-analyze-audio-video.py   # Combined audio/video analysis
 │   ├── ivs-channel-subscribe-transcribe.py            # Real-time transcription (Whisper)
 │   ├── ivs-channel-subscribe-transcribe-deepgram.py   # Real-time transcription (Deepgram)
+│   ├── ivs-channel-subscribe-transcribe-elevenlabs.py # Real-time transcription (ElevenLabs)
 │   └── ivs_metadata_publisher.py                      # Timed metadata publisher
 ├── stages-publish/                                     # Real-Time Stages publishing
 │   ├── ivs-stage-publish.py                           # Basic media publishing
@@ -75,6 +80,7 @@ sample-amazon-ivs-python-demos/
 ├── stages-subscribe/                                   # Real-Time Stages subscribing
 │   ├── ivs-stage-subscribe-transcribe.py              # Subscribe with transcription (Whisper)
 │   ├── ivs-stage-subscribe-transcribe-deepgram.py     # Subscribe with transcription (Deepgram)
+│   ├── ivs-stage-subscribe-transcribe-elevenlabs.py   # Subscribe with transcription (ElevenLabs)
 │   ├── ivs-stage-subscribe-analyze-frames.py          # Subscribe with AI frame analysis
 │   └── ivs-stage-subscribe-analyze-video.py           # Subscribe with AI video analysis
 ├── stages-nova-s2s/                                    # AI Speech-to-Speech
@@ -90,6 +96,15 @@ sample-amazon-ivs-python-demos/
 │   ├── ivs-stage-deepgram-scribe.py                    # Meeting scribe (multi-participant)
 │   ├── scribe_video_track.py                           # Static logo video track
 │   └── robot-icon.png                                  # Scribe video icon image
+├── stages-elevenlabs-agent/                                # ElevenLabs Conversational AI Agent
+│   ├── ivs-stage-elevenlabs-agent.py                   # ElevenLabs Agent integration
+│   ├── ivs-stage-elevenlabs-group-agent.py             # Multi-participant wake-word agent
+│   ├── ivs-stage-elevenlabs-agent-manager.py           # Multi-instance manager via IVS Chat
+│   └── elevenlabs_agent_manager.py                     # ElevenLabs Agent WebSocket manager
+├── stages-elevenlabs-meeting-transcriber/                       # ElevenLabs Meeting Transcriber
+│   ├── ivs-stage-elevenlabs-meeting-transcriber.py             # Meeting transcriber (multi-participant)
+│   ├── scribe_video_track.py                           # Static logo video track
+│   └── robot-icon.png                                  # Scribe video icon image
 └── stages_sei/                                         # SEI Publishing System
     ├── SEI.md                                          # SEI documentation and usage guide
     ├── sei_publisher.py                                # High-level SEI message publishing
@@ -103,6 +118,7 @@ sample-amazon-ivs-python-demos/
 - Amazon IVS Real-Time Stage ARN and participant tokens
 - FFmpeg (for media processing when using transcription demo - not necessary otherwise)
 - Deepgram API key (for Deepgram transcription demo - sign up at [deepgram.com](https://deepgram.com/))
+- ElevenLabs API key (for ElevenLabs demos - sign up at [elevenlabs.io](https://elevenlabs.io/))
 - Audio input/output devices (for speech-to-speech functionality)
 
 ### AWS Permissions Required
@@ -191,6 +207,9 @@ export BRAVE_API_KEY=your_brave_api_key
 
 # Optional: For Deepgram real-time transcription
 export DEEPGRAM_API_KEY=your_deepgram_api_key
+
+# Optional: For ElevenLabs real-time transcription and voice agents
+export ELEVENLABS_API_KEY=your_elevenlabs_api_key
 ```
 
 ### Weather API (Optional)
@@ -262,6 +281,15 @@ The `channels-subscribe/` directory contains scripts for subscribing to and anal
 - Optional publishing of transcripts as IVS timed metadata
 - No GPU required — all processing happens on Deepgram's servers
 
+**ivs-channel-subscribe-transcribe-elevenlabs.py**
+
+- Real-time streaming audio transcription using [ElevenLabs](https://elevenlabs.io/) Scribe v2 Realtime
+- True streaming transcription via WebSocket
+- VAD-based or manual commit strategies
+- Word-level timestamps with language detection
+- Optional timed metadata publishing
+- No GPU required — all processing happens on ElevenLabs' servers
+
 **ivs_metadata_publisher.py**
 
 - Reusable module for publishing timed metadata to IVS channels
@@ -290,6 +318,11 @@ python channels-subscribe/ivs-channel-subscribe-transcribe-deepgram.py \
   --language en \
   --diarize \
   --publish-transcript-as-timed-metadata
+
+# Real-time transcription with ElevenLabs
+python channels-subscribe/ivs-channel-subscribe-transcribe-elevenlabs.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality
 
 # Video analysis with TwelveLabs Pegasus
 python channels-subscribe/ivs-channel-subscribe-analyze-video.py \
@@ -594,6 +627,48 @@ python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
   --sentiment --topics --intents --summarize \
   --intelligence-interval 60
 ```
+
+#### ivs-stage-subscribe-transcribe-elevenlabs.py
+
+Subscribes to IVS stage audio streams and provides real-time streaming speech-to-text transcription using [ElevenLabs](https://elevenlabs.io/) Scribe v2 Realtime with optional VTT file output.
+
+**Features:**
+
+- Real-time streaming transcription via ElevenLabs Scribe v2 Realtime WebSocket
+- VAD-based or manual commit strategies
+- Word-level timestamps with speaker IDs
+- Language detection
+- VTT subtitle output
+- No GPU required — all processing happens on ElevenLabs' servers
+
+**Usage:**
+
+```bash
+cd stages-subscribe
+
+# Basic transcription
+python ivs-stage-subscribe-transcribe-elevenlabs.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With language detection and VTT output
+python ivs-stage-subscribe-transcribe-elevenlabs.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --language-code en \
+  --transcription-output-path "output.vtt" \
+  --transcription-output-format "vtt"
+```
+
+**Command-line Arguments:**
+
+- `--participant-id`: ID of the participant to subscribe to (required)
+- `--token`: JWT participant token with subscribe capabilities (required)
+- `--elevenlabs-api-key`: ElevenLabs API key (or set `ELEVENLABS_API_KEY` env var)
+- `--language-code`: Language code for transcription (default: "en"). Use "auto" for automatic detection
+- `--commit-strategy`: Transcription commit strategy — "vad" or "manual" (default: "vad")
+- `--transcription-output-path`: Path to save transcription output file (optional)
+- `--transcription-output-format`: Format for transcription output — currently supports "vtt" (optional)
 
 #### ivs-stage-subscribe-analyze-frames.py
 
@@ -1020,6 +1095,174 @@ python ivs-stage-deepgram-scribe.py \
 
 For detailed documentation, see **[`stages-deepgram-scribe/README.md`](stages-deepgram-scribe/README.md)**.
 
+### Stages ElevenLabs Voice Agent
+
+The `stages-elevenlabs-agent/` directory contains a conversational AI voice agent powered by [ElevenLabs' Conversational AI API](https://elevenlabs.io/docs/conversational-ai/overview), integrated with IVS Real-Time Stages.
+
+ElevenLabs' Conversational AI handles the entire voice conversation loop — speech-to-text, LLM reasoning, and text-to-speech — through a single WebSocket connection, with support for configurable LLMs, thousands of voices (plus custom voice cloning), and client-side tool calling.
+
+#### ivs-stage-elevenlabs-agent.py
+
+**Features:**
+
+- Single WebSocket for the full STT → LLM → TTS pipeline
+- Bidirectional audio streaming with IVS participants
+- Configurable LLM (OpenAI, Anthropic, Google, ElevenLabs hosted)
+- Thousands of ElevenLabs TTS voices (multilingual, plus custom voice cloning)
+- AI-powered video frame analysis via Bedrock Claude client tool calling (ask "what do you see?")
+- SEI transcript publishing (user and agent text embedded in H.264 video stream)
+- Real-time audio visualization (reuses proven AgentVideoTrack)
+- Automatic barge-in / interruption handling
+- Auto-create or bring your own agent (`--agent-id`)
+- Multilingual auto-detection — agent detects and responds in the user's language (`--multilingual`)
+- Custom system prompts and greeting messages
+
+**Usage:**
+
+```bash
+cd stages-elevenlabs-agent
+
+# Basic conversation
+python ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# Custom voice
+python ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --voice-id "EXAVITQu4vr4xnSDxMaL"
+
+# Custom personality
+python ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --prompt "You are a pirate. Respond in pirate speak." \
+  --greeting "Ahoy! What can I do for ye?"
+
+# With existing agent
+python ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --agent-id "agent_abc123"
+```
+
+**Command-line Arguments:**
+
+- `--token`: JWT participant token with both publish and subscribe capabilities (required)
+- `--subscribe-to`: Participant ID to subscribe to (required)
+- `--elevenlabs-api-key`: ElevenLabs API key (or set `ELEVENLABS_API_KEY` env var)
+- `--agent-id`: Existing ElevenLabs agent ID (auto-creates and deletes if not set)
+- `--voice-id`: ElevenLabs voice ID (default: "JBFqnCBsd6RMkjVDRZzb" = George)
+- `--llm-model`: LLM model for reasoning (default: "gemini-2.0-flash")
+- `--prompt`: System prompt for the agent personality
+- `--greeting`: Greeting message spoken when the session starts
+- `--language`: Language code (default: "en")
+- `--ice-timeout`: ICE gathering timeout in seconds (default: 1)
+- `--disable-frame-analysis`: Disable video frame analysis (default: enabled)
+- `--bedrock-model-id`: Bedrock model for frame analysis (default: "us.anthropic.claude-sonnet-4-6")
+- `--bedrock-region`: AWS region for Bedrock (default: "us-east-1")
+
+**Key Components:**
+
+1. **ElevenLabsAgentManager**: Manages the Conversational AI WebSocket — agent creation, audio streaming, tool calls, event handling
+2. **AgentAudioTrack**: Buffers ElevenLabs TTS audio and streams it to IVS via WebRTC (reused from Nova demo)
+3. **AgentVideoTrack**: Visual feedback with throbbing circle animation (reused from Nova demo)
+
+**How It Compares:**
+
+| Feature               | Nova S2S              | GPT Real-time     | Deepgram Agent                         | ElevenLabs Agent                               |
+| --------------------- | --------------------- | ----------------- | -------------------------------------- | ---------------------------------------------- |
+| STT                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Nova-3                        | ElevenLabs (built-in)                          |
+| LLM                   | Nova Sonic (built-in) | GPT-4o (built-in) | Configurable (OpenAI, Anthropic, Groq) | Configurable (OpenAI, Anthropic, Google, more) |
+| TTS                   | Nova Sonic (built-in) | OpenAI (built-in) | Deepgram Aura (50+ voices)             | ElevenLabs (thousands of voices)               |
+| Vision                | Bedrock Claude (tool) | OpenAI native     | Bedrock Claude (tool)                  | Bedrock Claude (client tool)                   |
+| WebSocket Connections | 1 (Bedrock)           | 1 (OpenAI)        | 1 (Deepgram)                           | 1 (ElevenLabs)                                 |
+| AWS Dependency        | Yes (Bedrock)         | No                | Optional (Bedrock for vision only)     | Optional (Bedrock for vision only)             |
+| LLM Flexibility       | Fixed                 | Fixed             | Swappable                              | Swappable                                      |
+
+**Prerequisites:**
+
+- ElevenLabs API key — sign up at [elevenlabs.io](https://elevenlabs.io/)
+- IVS stage token with both publish and subscribe capabilities
+
+**Environment Variables:**
+
+```bash
+export ELEVENLABS_API_KEY="your-elevenlabs-api-key"
+```
+
+#### ElevenLabs Agent Manager
+
+For automated management of multiple ElevenLabs Agent instances via WebSocket integration with IVS Chat, use `ivs-stage-elevenlabs-agent-manager.py`. This companion tool dynamically launches and manages agent instances based on chat messages, with full control over voice, LLM model, prompt, and greeting.
+
+```bash
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-agent-manager.py \
+  --chat-room-arn "arn:aws:ivschat:us-east-1:123456789012:room/abcdefgh" \
+  --ws-endpoint "wss://edge.ivschat.us-east-1.amazonaws.com" \
+  --verbose
+```
+
+Chat message payload to launch an agent:
+
+```json
+{
+  "action": "LAUNCH_ASSISTANT",
+  "stageArn": "arn:aws:ivs:us-east-1:123456789012:stage/abcdefgh",
+  "participantId": "participant-123",
+  "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+  "llmModel": "gemini-2.0-flash",
+  "agentId": null,
+  "prompt": "You are a friendly assistant.",
+  "greeting": "Hello!",
+  "disableFrameAnalysis": false,
+  "bedrockModelId": "us.anthropic.claude-sonnet-4-6"
+}
+```
+
+For detailed documentation including all voices, SEI transcript format, troubleshooting, and frontend integration examples, see **[`stages-elevenlabs-agent/README.md`](stages-elevenlabs-agent/README.md)**.
+
+### Stages ElevenLabs Meeting Transcriber
+
+The `stages-elevenlabs-meeting-transcriber/` directory contains an AI meeting transcriber that joins an IVS stage as a silent participant, transcribes all speakers using ElevenLabs Scribe v2 Realtime, and publishes transcripts via SEI metadata.
+
+**Features:**
+
+- Multi-participant transcription — automatically subscribes to every publishing participant
+- Dynamic join/leave tracking via stage events WebSocket
+- Per-speaker ElevenLabs Scribe v2 Realtime STT connections
+- Word-level timestamps with language detection
+- VAD-based or manual commit strategies
+- SEI transcript publishing embedded in H.264 video
+- Static robot icon video track with silent audio
+
+**Usage:**
+
+```bash
+cd stages-elevenlabs-meeting-transcriber
+
+# Basic meeting transcription
+python ivs-stage-elevenlabs-meeting-transcriber.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With language detection
+python ivs-stage-elevenlabs-meeting-transcriber.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --language-code auto --include-language-detection true
+```
+
+**Command-line Arguments:**
+
+- `--token`: IVS participant token with PUBLISH and SUBSCRIBE capabilities (required)
+- `--elevenlabs-api-key`: ElevenLabs API key (or set `ELEVENLABS_API_KEY` env var)
+- `--model-id`: ElevenLabs STT model (default: "scribe_v2_realtime")
+- `--language-code`: Language code or "auto" (default: "en")
+- `--commit-strategy`: Commit strategy — "vad" or "manual" (default: "vad")
+- `--include-timestamps`: Include word-level timestamps (default: true)
+- `--include-language-detection`: Include language detection (default: false)
+
+For detailed documentation, see **[`stages-elevenlabs-meeting-transcriber/README.md`](stages-elevenlabs-meeting-transcriber/README.md)**.
+
 ### Stages SEI Publishing
 
 The `stages_sei/` directory contains a comprehensive SEI (Supplemental Enhancement Information) publishing system for embedding metadata directly into H.264 video streams.
@@ -1235,6 +1478,21 @@ python stages-subscribe/ivs-stage-subscribe-transcribe-deepgram.py \
   --intelligence-interval 60
 ```
 
+#### ElevenLabs Transcription Examples
+
+```bash
+# ElevenLabs stage transcription
+python stages-subscribe/ivs-stage-subscribe-transcribe-elevenlabs.py \
+  --participant-id "participant123" \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --language-code en
+
+# ElevenLabs channel transcription
+python channels-subscribe/ivs-channel-subscribe-transcribe-elevenlabs.py \
+  --playlist-url "https://example.com/playlist.m3u8" \
+  --highest-quality
+```
+
 #### Video Frame Analysis Examples
 
 ```bash
@@ -1417,6 +1675,64 @@ python stages-deepgram-scribe/ivs-stage-deepgram-scribe.py \
   --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
   --model nova-3-medical --language auto \
   --sentiment --summarize --intelligence-interval 60
+```
+
+#### ElevenLabs Voice Agent Examples
+
+```bash
+# Basic ElevenLabs voice agent
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123"
+
+# With existing agent
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --agent-id "agent_abc123"
+
+# Custom voice and LLM
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --voice-id "EXAVITQu4vr4xnSDxMaL" \
+  --llm-model "gpt-4o"
+
+# Multilingual — auto-detect and respond in the user's language
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --subscribe-to "participant123" \
+  --multilingual
+```
+
+#### ElevenLabs Group Agent Examples
+
+```bash
+# Wake-word activated agent in a multi-participant stage
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-group-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --wake-word "hey assistant"
+
+# Custom wake/sleep words with extended context
+python stages-elevenlabs-agent/ivs-stage-elevenlabs-group-agent.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --wake-word "ok agent" \
+  --sleep-word "goodbye agent" \
+  --context-window 120 \
+  --active-listening-window 15
+```
+
+#### ElevenLabs Meeting Transcriber Examples
+
+```bash
+# Basic meeting transcriber — transcribes all participants
+python stages-elevenlabs-meeting-transcriber/ivs-stage-elevenlabs-meeting-transcriber.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..."
+
+# With language detection
+python stages-elevenlabs-meeting-transcriber/ivs-stage-elevenlabs-meeting-transcriber.py \
+  --token "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzM4NCJ9..." \
+  --language-code auto --include-language-detection true
 ```
 
 #### Publish and Subscribe Example
@@ -1641,7 +1957,8 @@ For issues related to:
 - **aiortc**: Check the [aiortc documentation](https://aiortc.readthedocs.io/)
 - **OpenAI Whisper**: Check the [Whisper repository](https://github.com/openai/whisper)
 - **Deepgram**: Check the [Deepgram documentation](https://developers.deepgram.com/docs) and [API reference](https://developers.deepgram.com/reference/deepgram-api-overview)
+- **ElevenLabs**: Check the [ElevenLabs documentation](https://elevenlabs.io/docs) and [API reference](https://elevenlabs.io/docs/api-reference)
 
 ---
 
-_This project demonstrates advanced integration patterns between Amazon IVS services and AI capabilities. From real-time conversational AI with Nova Sonic to comprehensive video analysis with Claude and TwelveLabs Pegasus, and streaming transcription with Deepgram and Whisper, these demos showcase the power of combining live video streaming with cutting-edge AI services._
+_This project demonstrates advanced integration patterns between Amazon IVS services and AI capabilities. From real-time conversational AI with Nova Sonic to comprehensive video analysis with Claude and TwelveLabs Pegasus, streaming transcription with Deepgram, Whisper, and ElevenLabs, and voice agents powered by Deepgram and ElevenLabs, these demos showcase the power of combining live video streaming with cutting-edge AI services._
