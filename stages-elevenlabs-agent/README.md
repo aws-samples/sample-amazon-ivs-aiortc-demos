@@ -409,6 +409,7 @@ python ivs-stage-elevenlabs-group-agent.py \
 | `--disable-frame-analysis`  | _(enabled)_                      | Disable vision via Bedrock Claude                             |
 | `--bedrock-model-id`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model for frame analysis                              |
 | `--bedrock-region`          | `us-east-1`                      | AWS region for Bedrock                                        |
+| `--publish-interim-sei`     | _(disabled)_                     | Publish interim (partial) transcripts as SEI metadata         |
 | `--ice-timeout`             | `1`                              | ICE gathering timeout in seconds                              |
 
 ### Group Agent SEI Format

@@ -90,18 +90,19 @@ python ivs-stage-elevenlabs-meeting-transcriber.py \
 
 ## Command-Line Arguments
 
-| Argument                       | Required | Default                      | Description                                      |
-| ------------------------------ | -------- | ---------------------------- | ------------------------------------------------ |
-| `--token`                      | Yes      | —                            | IVS participant token (PUBLISH + SUBSCRIBE)      |
-| `--elevenlabs-api-key`         | No       | `ELEVENLABS_API_KEY` env var | ElevenLabs API key                               |
-| `--model-id`                   | No       | `scribe_v2_realtime`         | ElevenLabs STT model ID                          |
-| `--language-code`              | No       | `en`                         | Language code or `auto`                          |
-| `--commit-strategy`            | No       | `vad`                        | Commit strategy: `vad` or `manual`               |
-| `--vad-silence-threshold-secs` | No       | `1.5`                        | Seconds of silence before auto-commit (VAD only) |
-| `--vad-threshold`              | No       | `0.4`                        | Speech detection sensitivity 0.0–1.0 (VAD only)  |
-| `--include-timestamps`         | No       | `true`                       | Include word-level timestamps                    |
-| `--include-language-detection` | No       | `false`                      | Include language detection per transcript        |
-| `--ice-timeout`                | No       | `1`                          | ICE gathering timeout in seconds                 |
+| Argument                       | Required | Default                      | Description                                           |
+| ------------------------------ | -------- | ---------------------------- | ----------------------------------------------------- |
+| `--token`                      | Yes      | —                            | IVS participant token (PUBLISH + SUBSCRIBE)           |
+| `--elevenlabs-api-key`         | No       | `ELEVENLABS_API_KEY` env var | ElevenLabs API key                                    |
+| `--model-id`                   | No       | `scribe_v2_realtime`         | ElevenLabs STT model ID                               |
+| `--language-code`              | No       | `en`                         | Language code or `auto`                               |
+| `--commit-strategy`            | No       | `vad`                        | Commit strategy: `vad` or `manual`                    |
+| `--vad-silence-threshold-secs` | No       | `1.5`                        | Seconds of silence before auto-commit (VAD only)      |
+| `--vad-threshold`              | No       | `0.4`                        | Speech detection sensitivity 0.0–1.0 (VAD only)       |
+| `--include-timestamps`         | No       | `true`                       | Include word-level timestamps                         |
+| `--include-language-detection` | No       | `false`                      | Include language detection per transcript             |
+| `--publish-interim-sei`        | No       | `false`                      | Publish interim (partial) transcripts as SEI metadata |
+| `--ice-timeout`                | No       | `1`                          | ICE gathering timeout in seconds                      |
 
 ## SEI Message Format
 

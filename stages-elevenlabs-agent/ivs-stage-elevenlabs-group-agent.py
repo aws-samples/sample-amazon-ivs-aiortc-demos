@@ -163,6 +163,7 @@ class GroupAgent:
         enable_frame_analysis=True,
         bedrock_model_id="us.anthropic.claude-sonnet-4-6",
         bedrock_region="us-east-1",
+        publish_interim_sei=False,
     ):
         self.token = token
         self.elevenlabs_api_key = elevenlabs_api_key
@@ -172,6 +173,7 @@ class GroupAgent:
         self.active_listening_window = active_listening_window
         self.model_id = model_id
         self.language_code = language_code
+        self.publish_interim_sei = publish_interim_sei
 
         self.token_payload = parse_jwt(token)
         self.my_jti = self.token_payload.get("jti", "")
@@ -552,7 +554,17 @@ class GroupAgent:
                         self._on_transcript(participant_id, speaker_label, text)
 
                 elif msg_type == "partial_transcript":
-                    pass  # Only care about final transcripts
+                    text = data.get("text", "")
+                    if text and self.publish_interim_sei:
+                        sei_data = {
+                            "type": "group_agent_transcript",
+                            "speaker": speaker_label,
+                            "participant_id": participant_id,
+                            "content": text,
+                            "is_final": False,
+                            "timestamp": time.time(),
+                        }
+                        asyncio.ensure_future(self.sei_publisher.publish_json(sei_data, repeat_count=1))
 
                 elif msg_type in (
                     "error",
@@ -667,6 +679,7 @@ Environment variables:
     parser.add_argument("--disable-frame-analysis", action="store_true", help="Disable vision/frame analysis")
     parser.add_argument("--bedrock-model-id", default="us.anthropic.claude-sonnet-4-6", help="Bedrock model for frame analysis")
     parser.add_argument("--bedrock-region", default="us-east-1", help="AWS region for Bedrock")
+    parser.add_argument("--publish-interim-sei", action="store_true", help="Publish interim (partial) transcripts as SEI metadata (default: false)")
     parser.add_argument("--ice-timeout", type=int, default=1, help="ICE timeout in seconds (default: 1)")
 
     return parser.parse_args()
@@ -719,6 +732,7 @@ async def main():
         enable_frame_analysis=not args.disable_frame_analysis,
         bedrock_model_id=args.bedrock_model_id,
         bedrock_region=args.bedrock_region,
+        publish_interim_sei=args.publish_interim_sei,
     )
 
     try:

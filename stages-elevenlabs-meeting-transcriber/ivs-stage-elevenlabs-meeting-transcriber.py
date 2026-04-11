@@ -166,6 +166,7 @@ class MeetingScribe:
         vad_threshold=0.4,
         include_timestamps=True,
         include_language_detection=False,
+        publish_interim_sei=False,
     ):
         self.token = token
         self.elevenlabs_api_key = elevenlabs_api_key
@@ -176,6 +177,7 @@ class MeetingScribe:
         self.vad_threshold = vad_threshold
         self.include_timestamps = include_timestamps
         self.include_language_detection = include_language_detection
+        self.publish_interim_sei = publish_interim_sei
 
         self.token_payload = parse_jwt(token)
         self.my_jti = self.token_payload.get("jti", "")
@@ -385,8 +387,17 @@ class MeetingScribe:
                 msg_type = data.get("message_type", "")
 
                 if msg_type == "partial_transcript":
-                    # Scribe only cares about final transcripts
-                    pass
+                    text = data.get("text", "")
+                    if text and self.publish_interim_sei:
+                        sei_data = {
+                            "type": "scribe_transcript",
+                            "speaker": speaker_label,
+                            "participant_id": participant_id,
+                            "content": text,
+                            "is_final": False,
+                            "timestamp": time.time(),
+                        }
+                        asyncio.ensure_future(self.sei_publisher.publish_json(sei_data, repeat_count=1))
 
                 elif msg_type == "committed_transcript":
                     text = data.get("text", "")
@@ -542,6 +553,11 @@ Environment variables:
         default=False,
         help="Include language detection (default: false)",
     )
+    parser.add_argument(
+        "--publish-interim-sei",
+        action="store_true",
+        help="Publish interim (partial) transcripts as SEI metadata in addition to final transcripts (default: false)",
+    )
     parser.add_argument("--ice-timeout", type=int, default=1, help="ICE timeout in seconds (default: 1)")
     return parser.parse_args()
 
@@ -587,6 +603,7 @@ async def main():
         vad_threshold=args.vad_threshold,
         include_timestamps=args.include_timestamps,
         include_language_detection=args.include_language_detection,
+        publish_interim_sei=args.publish_interim_sei,
     )
 
     try:
