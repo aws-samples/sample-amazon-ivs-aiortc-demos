@@ -126,7 +126,6 @@ class IVSStageGptRealtimeAssistantManager:
                     cmd.append("--disable-frame-analysis")
 
             logger.info(f"🚀 Launching gpt-realtime instance for participant {participant_id}")
-            logger.debug(f"Command: {' '.join(cmd)}")
 
             # Launch the process with appropriate output handling
             if self.verbose:

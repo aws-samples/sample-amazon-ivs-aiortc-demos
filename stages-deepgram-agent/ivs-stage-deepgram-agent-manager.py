@@ -162,7 +162,6 @@ class IVSStageDeepgramAgentManager:
                     cmd.extend(["--bedrock-region", str(bedrock_region)])
 
             logger.info(f"🚀 Launching Deepgram Agent for participant {participant_id}")
-            logger.debug(f"Command: {' '.join(cmd)}")
 
             if self.verbose:
                 process = subprocess.Popen(
