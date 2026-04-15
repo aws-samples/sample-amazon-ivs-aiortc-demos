@@ -621,8 +621,6 @@ class GptRealtimeManager:
             # Calculate how long ago the location was updated
             time_since_update = time.time() - self.user_location["last_updated"]
 
-            logger.info(f"📍 Providing user location: lat={self.user_location['latitude']}, long={self.user_location['longitude']}")
-
             return {
                 "latitude": self.user_location["latitude"],
                 "longitude": self.user_location["longitude"],
