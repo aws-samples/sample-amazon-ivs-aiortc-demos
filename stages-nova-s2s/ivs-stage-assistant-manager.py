@@ -92,7 +92,6 @@ class IVSStageAssistantManager:
             cmd = [sys.executable, script_path, "--token", token, "--subscribe-to", participant_id]
 
             logger.info(f"🚀 Launching Nova instance for participant {participant_id}")
-            logger.debug(f"Command: {' '.join(cmd)}")
 
             # Launch the process with appropriate output handling
             if self.verbose:
